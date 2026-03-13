@@ -1,6 +1,9 @@
+---
 name: Create initial open source checklist
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +17,7 @@ jobs:
 
     steps:
       - name: Create initial checklist issue if missing
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const owner = context.repo.owner;
