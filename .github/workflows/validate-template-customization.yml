@@ -1,0 +1,123 @@
+name: Validate template customization
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.repository != 'SchweizerischeBundesbahnen/open-source-repo-template'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate required files
+        run: |
+          set -euo pipefail
+
+          required_files=(
+            README.md
+            LICENSE.md
+            CONTRIBUTING.md
+            CODE_OF_CONDUCT.md
+            .github/open-source-bootstrap-checklist.md
+            .github/workflows/create-initial-open-source-checklist.yml
+          )
+
+          missing=0
+          for file in "${required_files[@]}"; do
+            if [[ ! -f "$file" ]]; then
+              echo "Missing required file: $file"
+              missing=1
+            fi
+          done
+
+          if [[ "$missing" -ne 0 ]]; then
+            exit 1
+          fi
+
+          # Warn about recommended files without failing the build
+          recommended_files=(
+            CODING_STANDARDS.md
+            RELEASE.md
+            SUPPORT.md
+          )
+
+          for file in "${recommended_files[@]}"; do
+            if [[ ! -f "$file" ]]; then
+              echo "::warning::Recommended file missing: $file — delete intentionally or add it before publishing."
+            fi
+          done
+
+      - name: Validate unresolved template tokens
+        run: |
+          set -euo pipefail
+
+          if grep -RInE --exclude-dir=.git --exclude-dir=license_suggestions --exclude='*.png' --exclude='*.jpg' --exclude='*.svg' '\{\{[A-Z0-9_]+\}\}' .; then
+            echo 'Unresolved template tokens found.'
+            exit 1
+          fi
+
+      - name: Validate license_suggestions cleanup
+        run: |
+          set -euo pipefail
+
+          if [[ -d license_suggestions && -f LICENSE.md ]]; then
+            echo 'LICENSE.md exists but license_suggestions/ has not been removed.'
+            echo 'Delete the license_suggestions/ directory after choosing your license.'
+            exit 1
+          fi
+
+      - name: Validate stale template references
+        run: |
+          set -euo pipefail
+
+          files=(
+            README.md
+            CONTRIBUTING.md
+            CODE_OF_CONDUCT.md
+            CODING_STANDARDS.md
+            CHANGELOG.md
+            RELEASE.md
+            SUPPORT.md
+            .github/open-source-bootstrap-checklist.md
+            .github/CODEOWNERS
+            .github/pull_request_template.md
+            .github/ISSUE_TEMPLATE/bug_report.yml
+            .github/ISSUE_TEMPLATE/feature_request.yml
+            .github/ISSUE_TEMPLATE/config.yml
+          )
+
+          patterns=(
+            'open-source-repo-template'
+            'open-source-polarion-java-repo-template'
+            'sbb-your-project'
+            'INSERT '
+            ' WIP'
+            '^WIP'
+          )
+
+          existing_files=()
+          for file in "${files[@]}"; do
+            if [[ -f "$file" ]]; then
+              existing_files+=("$file")
+            fi
+          done
+
+          if [[ ${#existing_files[@]} -eq 0 ]]; then
+            echo "No target files found to check for stale references."
+            exit 0
+          fi
+
+          for pattern in "${patterns[@]}"; do
+            if grep -InE "$pattern" "${existing_files[@]}"; then
+              echo "Stale template content found for pattern: $pattern"
+              exit 1
+            fi
+          done

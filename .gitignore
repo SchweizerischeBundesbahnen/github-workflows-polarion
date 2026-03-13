@@ -1,0 +1,15 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.*
+
+# Build (add project-specific rules below)

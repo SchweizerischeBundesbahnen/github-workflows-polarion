@@ -1,0 +1,6 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Support
+    # url must be a valid URL — for email use mailto:support@example.com
+    url: "{{SUPPORT_CHANNEL}}"
+    about: Use this channel for questions and general help, not for bug reports.
