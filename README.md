@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-> Replace every `{{TOKEN_NAME}}` placeholder before making a repository public. The validation workflow in generated repositories is intended to fail until customization is complete.
+> Replace every `{{TOKEN_NAME}}` placeholder before making a repository public. Run the validation workflow manually from the Actions tab to verify customization is complete.
 
 <!-- Uncomment and adjust the badges below after setting up CI and choosing a license.
 ![CI](https://github.com/SchweizerischeBundesbahnen/{{REPO_NAME}}/actions/workflows/ci.yml/badge.svg)
@@ -42,7 +42,7 @@ Describe the most common workflows for users and contributors. Include links to 
 2. Replace all template tokens in the repository.
 3. Review [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [CODING_STANDARDS.md](CODING_STANDARDS.md), and [RELEASE.md](RELEASE.md).
 4. Review the GitHub scaffolding in [.github](.github), especially CODEOWNERS, issue forms, the PR template, Dependabot, and workflows.
-5. Manually run the workflow in [.github/workflows/create-initial-open-source-checklist.yml](.github/workflows/create-initial-open-source-checklist.yml) to open the initial readiness checklist issue.
+5. The readiness checklist issue is created automatically on the first push to `main`. If not, run [create-initial-open-source-checklist.yml](.github/workflows/create-initial-open-source-checklist.yml) manually from the Actions tab.
 
 ## Included Files
 

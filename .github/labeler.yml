@@ -1,3 +1,4 @@
+---
 # Label pull requests based on the paths of changed files.
 # See: https://github.com/actions/labeler
 
@@ -5,7 +6,10 @@ documentation:
   - changed-files:
       - any-glob-to-any-file:
           - "*.md"
+          - "*.rst"
           - "docs/**"
+          - "LICENSE"
+          - "LICENSE.*"
 
 ci:
   - changed-files:
