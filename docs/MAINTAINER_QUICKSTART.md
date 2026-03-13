@@ -5,7 +5,7 @@ Use this checklist in the first 10 minutes after creating a new repository from 
 ## 1. Choose the license
 
 1. Review the approved license texts in [license_suggestions](../license_suggestions).
-2. Copy the chosen text to `LICENSE.md`.
+2. Copy the chosen text to a `LICENSE` file (e.g. `LICENSE`, `LICENSE.md`, `LICENSE.txt`).
 3. If using Apache 2.0, update [NOTICE](../NOTICE) with the project name and year. If not using Apache 2.0, delete the `NOTICE` file.
 4. Delete the `license_suggestions/` directory after making your choice.
 
@@ -54,9 +54,9 @@ The template includes several GitHub configuration files. Keep what fits your pr
 
 ## 5. Open the repository readiness checklist
 
-Manually run [create-initial-open-source-checklist.yml](../.github/workflows/create-initial-open-source-checklist.yml) from the Actions tab.
+The checklist issue is created automatically on the first push to `main` after creating a repository from the template. If it was not created, run [create-initial-open-source-checklist.yml](../.github/workflows/create-initial-open-source-checklist.yml) manually from the Actions tab.
 
-That creates the issue based on [open-source-bootstrap-checklist.md](../.github/open-source-bootstrap-checklist.md), which should track the remaining repository setup work.
+The issue is based on [open-source-bootstrap-checklist.md](../.github/open-source-bootstrap-checklist.md) and tracks the remaining repository setup work.
 
 ## 6. Enable the required repo settings
 
@@ -72,9 +72,9 @@ Use the generated checklist issue to track these actions.
 
 ## 7. Validate before publishing
 
-The workflow [validate-template-customization.yml](../.github/workflows/validate-template-customization.yml) is intended to fail until placeholders are removed and required files exist.
+Before making the repository public, run [validate-template-customization.yml](../.github/workflows/validate-template-customization.yml) manually from the **Actions** tab. This workflow checks that all template placeholders are resolved, required files exist, and no stale template references remain.
 
-Make the repository green before announcing or publishing it.
+The workflow runs on-demand only — it does not block pull requests during incremental setup. Run it as the final gate before announcing or publishing the repository.
 
 ## 8. Post-release cleanup
 

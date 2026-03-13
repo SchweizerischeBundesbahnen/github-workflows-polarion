@@ -7,7 +7,7 @@ These must be completed before making the repository public.
 - [ ] **This repository fulfils all requirements from the SBB Open Source Guidelines**
 - [ ] **Replace all template tokens in the form `{{TOKEN_NAME}}`**
 - [ ] **Add a README.md file containing the project overview, setup instructions, and support information**
-- [ ] **Add a LICENSE.md file using an approved SBB open source license**
+- [ ] **Add a LICENSE file (e.g. `LICENSE`, `LICENSE.md`, `LICENSE.txt`) using an approved SBB open source license**
 - [ ] **Add a CONTRIBUTING.md file**
 - [ ] **Add a CODE_OF_CONDUCT.md file with a private maintainer contact**
 - [x] **SECURITY.md is provided at the organisation level**

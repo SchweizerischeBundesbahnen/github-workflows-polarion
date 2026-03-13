@@ -31,14 +31,12 @@ jobs:
 
             const body = Buffer.from(content.data.content, content.data.encoding).toString('utf8').trim();
 
-            const { data: issues } = await github.rest.issues.listForRepo({
-              owner,
-              repo,
-              state: 'all',
+            const issues = await github.paginate(github.rest.search.issuesAndPullRequests, {
+              q: `repo:${owner}/${repo} is:issue in:title ${JSON.stringify(title)}`,
               per_page: 100,
             });
 
-            const existingIssue = issues.find((issue) => issue.title === title && !issue.pull_request);
+            const existingIssue = issues.find((item) => item.title === title);
 
             if (existingIssue) {
               core.notice(`Checklist issue already exists: #${existingIssue.number}`);

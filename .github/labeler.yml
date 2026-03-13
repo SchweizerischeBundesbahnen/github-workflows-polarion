@@ -6,7 +6,10 @@ documentation:
   - changed-files:
       - any-glob-to-any-file:
           - "*.md"
+          - "*.rst"
           - "docs/**"
+          - "LICENSE"
+          - "LICENSE.*"
 
 ci:
   - changed-files:
