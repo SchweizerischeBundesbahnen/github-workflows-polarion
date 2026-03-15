@@ -43,9 +43,10 @@ flowchart TD
   C --> D(Step 1: Read CLAUDE.md and project conventions)
   D --> E(Step 2: Get PR diff + fetch previous comments)
   E --> F(Step 3: Process previous claude bot review threads)
-  F --> G(Step 4: Analyze diff and post inline comments)
-  G --> H(Step 5: Minimize outdated claude summary comments)
-  H --> I(Step 6: Post PR summary comment)
+  F --> G(Step 4: Triage Copilot review comments)
+  G --> H(Step 5: Analyze diff and post inline comments)
+  H --> I(Step 6: Minimize outdated claude summary comments)
+  I --> J(Step 7: Post PR summary comment)
 ```
 
 ### Step 1: Learn Project Context
@@ -67,7 +68,19 @@ For every unresolved review thread authored by `claude[bot]`:
 | **Still present** | Leave thread open, count in summary |
 | **Already resolved** | Skip |
 
-### Step 4: Analyze and Post Inline Comments
+### Step 4: Triage Copilot Review Comments
+
+Claude checks if a Copilot code review check run exists for the current commit. If running, it polls every 30 seconds (up to 5 minutes) until complete. If Copilot is not enabled, it skips waiting and triages any existing threads from previous commits.
+
+| Classification | Action |
+|---------------|--------|
+| **Fixed** | Reply explaining it's fixed, resolve and minimize as outdated |
+| **Valid** | Leave thread open, count in summary |
+| **False positive** | Reply with explanation of why, resolve the thread |
+
+Claude critically evaluates each finding — cosmetic nitpicks and style preferences are dismissed, only real bugs and meaningful improvements are acknowledged.
+
+### Step 5: Analyze and Post Inline Comments
 
 Claude reviews each changed line, focusing on:
 
@@ -116,11 +129,11 @@ Each inline comment follows this format:
 | :yellow_circle: | Warning | Likely bug or risky pattern |
 | :large_blue_circle: | Convention | CLAUDE.md violation |
 
-### Step 5: Minimize Outdated Summary Comments
+### Step 6: Minimize Outdated Summary Comments
 
 Before posting a new summary, Claude finds all previous PR comments authored by `claude[bot]` that match the summary format and minimizes them as outdated. This prevents stale summaries from cluttering the PR conversation.
 
-### Step 6: Post PR Summary Comment
+### Step 7: Post PR Summary Comment
 
 A summary comment is posted on the PR with:
 
@@ -146,13 +159,14 @@ When a developer pushes fixes after a review:
 flowchart TD
   A(Developer pushes fix) --> B(Workflow triggers on synchronize)
   B --> C(Get full PR diff + previous comments)
-  C --> D{Previous issue status}
+  C --> D{Previous Claude issue status}
   D -->|Fixed| E(Resolve thread + minimize as outdated)
   D -->|Still present| F(Leave thread open)
   D -->|New issue| G(Post new inline comment)
-  E --> H(Minimize old summary comments)
-  F --> H
-  G --> H
+  E --> CP(Triage Copilot comments)
+  F --> CP
+  G --> CP
+  CP --> H(Minimize old summary comments)
   H --> I(Post updated summary)
 ```
 
