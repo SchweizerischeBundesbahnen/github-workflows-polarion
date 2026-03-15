@@ -14,5 +14,10 @@ permissions: {}
 jobs:
   claude-review:
     uses: ./.github/workflows/reusable-claude-code-review.yml
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
