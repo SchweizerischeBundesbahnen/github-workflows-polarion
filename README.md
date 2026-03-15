@@ -4,6 +4,8 @@
 
 Reusable GitHub Actions workflows for the SBB Polarion team.
 
+This repository contains **only reusable workflow definitions**. It does not contain application code, libraries, or standalone tools. Other repositories in the organization call these workflows via `workflow_call`.
+
 ## Overview
 
 - Status: Active
@@ -13,14 +15,12 @@ Reusable GitHub Actions workflows for the SBB Polarion team.
 
 ## Available Workflows
 
-### Reusable Workflows
-
 | Workflow | Description |
 |----------|-------------|
 | `reusable-claude-code-review.yml` | AI-powered code review using Claude Code |
 | `reusable-add-issue-to-project.yml` | Automatically add new issues to a GitHub project board |
 
-### Usage
+## Usage
 
 Call a reusable workflow from your repository:
 
@@ -42,6 +42,8 @@ jobs:
     with:
       project-number: ${{ vars.POLARION_GITHUB_PROJECT_NUMBER }}
 ```
+
+Each reusable workflow has a corresponding caller workflow (e.g. `claude-code-review.yml`) that demonstrates how this repository itself uses it.
 
 ## Security
 
