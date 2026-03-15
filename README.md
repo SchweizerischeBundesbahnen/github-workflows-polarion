@@ -17,6 +17,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 
 | Workflow | Description |
 |----------|-------------|
+| `reusable-actionlint.yml` | GitHub Actions workflow validation using actionlint |
 | `reusable-claude-code-review.yml` | AI-powered code review using Claude Code |
 | `reusable-add-issue-to-project.yml` | Automatically add new issues to a GitHub project board |
 | `reusable-pr.yml` | PR checks with conventional commit validation |
