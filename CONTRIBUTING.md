@@ -1,8 +1,8 @@
 # Contributing
 
-Thank you for contributing to {{PROJECT_NAME}}.
+Thank you for contributing to github-workflows-polarion.
 
-This document describes how to propose changes, report issues, and work with the maintainers. Replace any remaining `{{TOKEN_NAME}}` placeholders before making a repository public.
+This document describes how to propose changes, report issues, and work with the maintainers.
 
 ## Code of Conduct
 
