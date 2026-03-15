@@ -131,12 +131,15 @@ jobs:
                  }
                }'
                ```
-               Filter for threads where author login is "Copilot" and
-               isResolved is false.
+               Filter the results: ONLY include threads where
+               isResolved == false AND author login is "Copilot".
+               SKIP all threads where isResolved == true — these were
+               already handled (by a human or a previous review run).
+               Do NOT report resolved threads in the summary.
             b) Also fetch comment node_ids for the Copilot comments:
                `gh api --paginate repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login == "Copilot") | {id, node_id, path, line, body}'`
-            c) For each unresolved Copilot thread, read the CURRENT file
-               content and classify:
+            c) For each UNRESOLVED Copilot thread (isResolved == false
+               ONLY), read the CURRENT file content and classify:
                A) FIXED — the issue no longer exists. Reply explaining it was
                   fixed and resolve the thread:
                   ```
