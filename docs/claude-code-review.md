@@ -135,10 +135,18 @@ Before posting a new summary, Claude finds all previous PR comments authored by 
 
 ### Step 7: Post PR Summary Comment
 
-A summary comment is posted on the PR with:
+A summary comment is posted on the PR. The heading varies based on findings:
 
-- Issue count (or "no issues found")
+| Scenario | Heading |
+|----------|---------|
+| Claude found issues | `## Claude Code Review Summary` |
+| No issues, no open Copilot findings | `## ✅ No issues found` |
+| No Claude issues, but valid Copilot findings left open | `## ℹ️ No new issues found — Z Copilot finding(s) acknowledged` |
+
+Each summary includes:
+
 - Confidence score (1-5)
+- Copilot Review Triage section (if Copilot threads were found)
 - Table of important files changed
 
 **Confidence scale:**
