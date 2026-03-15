@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       reporter:
-        description: "Reviewdog reporter: github-check, github-pr-review, github-pr-check"
+        description: "Reviewdog reporter: github-check or github-pr-check"
         required: false
         type: string
         default: github-check
