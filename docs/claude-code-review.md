@@ -70,7 +70,7 @@ For every unresolved review thread authored by `claude[bot]`:
 
 ### Step 4: Triage Copilot Review Comments
 
-Claude triages any existing Copilot review threads on the PR. If Copilot hasn't posted yet, the threads will be picked up on the next review trigger.
+Claude checks if a Copilot code review check run exists for the current commit. If running, it polls every 30 seconds (up to 5 minutes) until complete. If Copilot is not enabled, it skips waiting and triages any existing threads from previous commits.
 
 | Classification | Action |
 |---------------|--------|
@@ -167,8 +167,6 @@ flowchart TD
   F --> CP
   G --> CP
   CP --> H(Minimize old summary comments)
-  F --> H
-  G --> H
   H --> I(Post updated summary)
 ```
 

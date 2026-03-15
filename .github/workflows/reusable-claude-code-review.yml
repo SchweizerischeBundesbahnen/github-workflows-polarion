@@ -101,10 +101,17 @@ jobs:
             The confidence score in Step 7 MUST account for still-open issues from
             previous reviews — you cannot score 5/5 if unresolved issues remain.
             STEP 4: Triage Copilot review comments.
-            Triage any existing Copilot review threads on this PR. If Copilot
-            hasn't posted yet (e.g. it runs after Claude), the threads will be
-            triaged on the next review trigger. Do NOT poll or wait for Copilot.
-            If no Copilot threads exist, skip this step entirely.
+            First, wait for Copilot code review to finish. Check the PR's
+            check runs for "Copilot code review":
+            ```
+            gh api repos/${{ github.repository }}/commits/${{ github.event.pull_request.head.sha }}/check-runs --jq '.check_runs[] | select(.name == "Copilot code review") | {status, conclusion}'
+            ```
+            - If no result: Copilot is not enabled. Skip waiting and proceed
+              to triage any existing threads from previous commits.
+            - If status is "queued" or "in_progress": poll every 30 seconds
+              (up to 5 minutes max) until status is "completed", then proceed.
+            - If status is "completed": proceed immediately.
+            If no Copilot threads exist after checking, skip to Step 5.
             a) Fetch all unresolved review threads on this PR and filter for
                those authored by Copilot:
                ```
@@ -127,7 +134,7 @@ jobs:
                Filter for threads where author login is "Copilot" and
                isResolved is false.
             b) Also fetch comment node_ids for the Copilot comments:
-               `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login == "Copilot") | {id, node_id, path, line, body}'`
+               `gh api --paginate repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login == "Copilot") | {id, node_id, path, line, body}'`
             c) For each unresolved Copilot thread, read the CURRENT file
                content and classify:
                A) FIXED — the issue no longer exists. Reply explaining it was
