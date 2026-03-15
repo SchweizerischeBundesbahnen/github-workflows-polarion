@@ -1,8 +1,8 @@
 # Contributing
 
-Thank you for contributing to {{PROJECT_NAME}}.
+Thank you for contributing to github-workflows-polarion.
 
-This document describes how to propose changes, report issues, and work with the maintainers. Replace any remaining `{{TOKEN_NAME}}` placeholders before making a repository public.
+This document describes how to propose changes, report issues, and work with the maintainers.
 
 ## Code of Conduct
 
@@ -54,6 +54,6 @@ This template recommends [Conventional Commits](https://www.conventionalcommits.
 - Approval does not guarantee merge if new risks are discovered later in review.
 - Rebase or merge from the default branch when requested by maintainers.
 
-## Maintainer Notes
+## Development
 
-Replace this section with repository-specific contribution details if the project needs additional guidance, such as development commands, local tooling, CLA requirements, or architecture review expectations.
+This repository contains only GitHub Actions workflow files (YAML). No build tools or local development setup is required. To contribute, edit or add workflow files under `.github/workflows/` and open a pull request.

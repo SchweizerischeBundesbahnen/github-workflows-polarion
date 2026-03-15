@@ -1,8 +1,6 @@
 
 # Code of Conduct
 
-> Replace `{{MAINTAINER_PRIVATE_CONTACT}}` before making a repository public.
-
 ## Our Pledge
 
 We as members, contributors, and leaders pledge to make participation in our
@@ -63,7 +61,7 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at
-{{MAINTAINER_PRIVATE_CONTACT}}.
+<https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/issues>.
 All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the

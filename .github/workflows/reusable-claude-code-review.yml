@@ -131,12 +131,15 @@ jobs:
                  }
                }'
                ```
-               Filter for threads where author login is "Copilot" and
-               isResolved is false.
+               Filter the results: ONLY include threads where
+               isResolved == false AND author login is "Copilot".
+               SKIP all threads where isResolved == true — these were
+               already handled (by a human or a previous review run).
+               Do NOT report resolved threads in the summary.
             b) Also fetch comment node_ids for the Copilot comments:
                `gh api --paginate repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login == "Copilot") | {id, node_id, path, line, body}'`
-            c) For each unresolved Copilot thread, read the CURRENT file
-               content and classify:
+            c) For each UNRESOLVED Copilot thread (isResolved == false
+               ONLY), read the CURRENT file content and classify:
                A) FIXED — the issue no longer exists. Reply explaining it was
                   fixed and resolve the thread:
                   ```
@@ -214,9 +217,11 @@ jobs:
                ```
             Do NOT skip this step. Old summaries clutter the PR conversation.
             STEP 7: Post a PR comment summary using `gh pr comment`.
-            You MUST use the EXACT HTML structure below — do NOT omit <details>
-            tags, do NOT replace the markdown table with a list, do NOT change
-            heading levels. Copy the template and only fill in the placeholders.
+            You MUST use the EXACT HTML structure below — do NOT replace the
+            markdown table with a list, do NOT change heading levels. Copy the
+            template and only fill in the placeholders.
+            EXCEPTION: The "Copilot Review Triage" <details> section MUST be
+            omitted entirely if no Copilot threads were found in Step 4.
             If issues were found:
             ```
             gh pr comment --repo ${{ github.repository }} ${{ github.event.pull_request.number }} --body "$(cat <<'EOF'
@@ -226,6 +231,10 @@ jobs:
             - Brief overall assessment of the PR safety/quality
             - Note any files that require special attention
             </details>
+            <details><summary><h3>Copilot Review Triage</h3></summary>
+            Triaged N Copilot comment(s): X resolved (fixed), Y dismissed (false positive), Z acknowledged (valid, left open).
+            - List each triaged comment with a one-line summary of the action taken
+            </details>
             <details><summary><h3>Important Files Changed</h3></summary>
             | Filename | Overview |
             |----------|----------|
@@ -234,7 +243,7 @@ jobs:
             EOF
             )"
             ```
-            If NO issues found:
+            If NO Claude issues found AND no valid Copilot findings left open:
             ```
             gh pr comment --repo ${{ github.repository }} ${{ github.event.pull_request.number }} --body "$(cat <<'EOF'
             ## ✅ No issues found
@@ -242,6 +251,31 @@ jobs:
             <details><summary><h3>Confidence Score: X/5</h3></summary>
             - Brief overall assessment of the PR safety/quality
             - This PR is safe to merge (or note any minor observations)
+            </details>
+            <details><summary><h3>Copilot Review Triage</h3></summary>
+            Triaged N Copilot comment(s): X resolved (fixed), Y dismissed (false positive), Z acknowledged (valid, left open).
+            - List each triaged comment with a one-line summary of the action taken
+            </details>
+            <details><summary><h3>Important Files Changed</h3></summary>
+            | Filename | Overview |
+            |----------|----------|
+            | `path/to/file.py` | Brief description of changes |
+            </details>
+            EOF
+            )"
+            ```
+            If NO Claude issues found BUT valid Copilot findings were left open:
+            ```
+            gh pr comment --repo ${{ github.repository }} ${{ github.event.pull_request.number }} --body "$(cat <<'EOF'
+            ## ℹ️ No new issues found — Z Copilot finding(s) acknowledged
+            No additional issues beyond what Copilot already flagged.
+            <details><summary><h3>Confidence Score: X/5</h3></summary>
+            - Brief overall assessment of the PR safety/quality
+            - Note that open Copilot findings still need human review
+            </details>
+            <details><summary><h3>Copilot Review Triage</h3></summary>
+            Triaged N Copilot comment(s): X resolved (fixed), Y dismissed (false positive), Z acknowledged (valid, left open).
+            - List each triaged comment with a one-line summary of the action taken
             </details>
             <details><summary><h3>Important Files Changed</h3></summary>
             | Filename | Overview |

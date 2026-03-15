@@ -3,5 +3,5 @@ blank_issues_enabled: true
 contact_links:
   - name: Questions & Support
     # url must be a valid URL — for email use mailto:support@example.com
-    url: "{{SUPPORT_CHANNEL}}"
+    url: "https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/issues"
     about: Use this channel for questions and general help, not for bug reports.

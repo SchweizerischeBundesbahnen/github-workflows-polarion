@@ -5,15 +5,15 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
-permissions:
-  contents: read
-  pull-requests: write
-
+permissions: {}
 jobs:
   label:
     if: github.repository != 'SchweizerischeBundesbahnen/open-source-repo-template'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
-      - uses: actions/labeler@v6
+      - uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b  # v6
         with:
           configuration-path: .github/labeler.yml
