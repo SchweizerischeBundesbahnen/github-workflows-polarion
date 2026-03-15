@@ -26,8 +26,6 @@ jobs:
             README.md
             CONTRIBUTING.md
             CODE_OF_CONDUCT.md
-            .github/open-source-bootstrap-checklist.md
-            .github/workflows/create-initial-open-source-checklist.yml
           )
 
           missing=0
@@ -106,7 +104,6 @@ jobs:
             CHANGELOG.md
             RELEASE.md
             SUPPORT.md
-            .github/open-source-bootstrap-checklist.md
             .github/CODEOWNERS
             .github/pull_request_template.md
             .github/ISSUE_TEMPLATE/bug_report.yml
