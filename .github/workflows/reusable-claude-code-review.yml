@@ -238,7 +238,7 @@ jobs:
             EOF
             )"
             ```
-            If NO Claude issues found:
+            If NO Claude issues found AND no valid Copilot findings left open:
             ```
             gh pr comment --repo ${{ github.repository }} ${{ github.event.pull_request.number }} --body "$(cat <<'EOF'
             ## ✅ No issues found
@@ -246,6 +246,27 @@ jobs:
             <details><summary><h3>Confidence Score: X/5</h3></summary>
             - Brief overall assessment of the PR safety/quality
             - This PR is safe to merge (or note any minor observations)
+            </details>
+            <details><summary><h3>Copilot Review Triage</h3></summary>
+            Triaged N Copilot comment(s): X resolved (fixed), Y dismissed (false positive), Z acknowledged (valid, left open).
+            - List each triaged comment with a one-line summary of the action taken
+            </details>
+            <details><summary><h3>Important Files Changed</h3></summary>
+            | Filename | Overview |
+            |----------|----------|
+            | `path/to/file.py` | Brief description of changes |
+            </details>
+            EOF
+            )"
+            ```
+            If NO Claude issues found BUT valid Copilot findings were left open:
+            ```
+            gh pr comment --repo ${{ github.repository }} ${{ github.event.pull_request.number }} --body "$(cat <<'EOF'
+            ## ℹ️ No new issues found — Z Copilot finding(s) acknowledged
+            No additional issues beyond what Copilot already flagged.
+            <details><summary><h3>Confidence Score: X/5</h3></summary>
+            - Brief overall assessment of the PR safety/quality
+            - Note that open Copilot findings still need human review
             </details>
             <details><summary><h3>Copilot Review Triage</h3></summary>
             Triaged N Copilot comment(s): X resolved (fixed), Y dismissed (false positive), Z acknowledged (valid, left open).
