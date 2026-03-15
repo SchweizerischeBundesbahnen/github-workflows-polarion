@@ -16,7 +16,6 @@ permissions: {}
 jobs:
   add-to-project:
     runs-on: ubuntu-latest
-    environment: github-project
     steps:
       - uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2.2.1
         id: app-token
@@ -26,5 +25,5 @@ jobs:
           owner: ${{ github.repository_owner }}
       - uses: actions/add-to-project@244f685bbc3b7adfa8466e08b698b5577571133e  # v1.0.2
         with:
-          project-url: https://github.com/orgs/SchweizerischeBundesbahnen/projects/${{ inputs.project-number }}
+          project-url: https://github.com/orgs/${{ github.repository_owner }}/projects/${{ inputs.project-number }}
           github-token: ${{ steps.app-token.outputs.token }}
