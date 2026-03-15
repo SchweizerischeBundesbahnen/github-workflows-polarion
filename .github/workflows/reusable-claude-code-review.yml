@@ -93,12 +93,12 @@ jobs:
                gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "COMMENT_NODE_ID", classifier: OUTDATED}) { minimizedComment { isMinimized } } }'
                ```
             B) STILL PRESENT — the issue was NOT fixed. Leave the thread open.
-               Count it as an open issue in your Step 5 summary.
+               Count it as an open issue in your Step 6 summary.
             C) ALREADY RESOLVED — skip, no action needed.
             Use the thread `id` from the reviewThreads query and the `node_id` from
             the comments REST API response fetched in step 2b.
             Do NOT skip this step even if you find no new issues.
-            The confidence score in Step 5 MUST account for still-open issues from
+            The confidence score in Step 6 MUST account for still-open issues from
             previous reviews — you cannot score 5/5 if unresolved issues remain.
             STEP 4: Submit your review as INLINE COMMENTS on the specific lines where
             issues are found, using the GitHub Pull Request Review API.
@@ -146,7 +146,18 @@ jobs:
             ...code example...
             </details>
             ```
-            STEP 5: Post a PR comment summary using `gh pr comment`.
+            STEP 5: MANDATORY — Minimize outdated Claude summary comments.
+            Before posting a new summary, find and minimize all previous PR
+            comments authored by claude[bot] that contain "Claude Code Review
+            Summary" or "No issues found" or "No new issues found".
+            a) Fetch all issue comments on the PR (use --paginate to get all pages):
+               `gh api --paginate repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login == "claude[bot]" and (.body | test("Claude Code Review Summary|No issues found|No new issues found"))) | {node_id, body}'`
+            b) For each comment returned by the query above, minimize it as outdated:
+               ```
+               gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "COMMENT_NODE_ID", classifier: OUTDATED}) { minimizedComment { isMinimized } } }'
+               ```
+            Do NOT skip this step. Old summaries clutter the PR conversation.
+            STEP 6: Post a PR comment summary using `gh pr comment`.
             You MUST use the EXACT HTML structure below — do NOT omit <details>
             tags, do NOT replace the markdown table with a list, do NOT change
             heading levels. Copy the template and only fill in the placeholders.
