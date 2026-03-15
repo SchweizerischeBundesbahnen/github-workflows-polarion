@@ -226,6 +226,10 @@ jobs:
             - Brief overall assessment of the PR safety/quality
             - Note any files that require special attention
             </details>
+            <details><summary><h3>Copilot Review Triage</h3></summary>
+            Triaged N Copilot comment(s): X resolved (fixed), Y dismissed (false positive), Z acknowledged (valid, left open).
+            - List each triaged comment with a one-line summary of the action taken
+            </details>
             <details><summary><h3>Important Files Changed</h3></summary>
             | Filename | Overview |
             |----------|----------|
@@ -234,7 +238,7 @@ jobs:
             EOF
             )"
             ```
-            If NO issues found:
+            If NO Claude issues found:
             ```
             gh pr comment --repo ${{ github.repository }} ${{ github.event.pull_request.number }} --body "$(cat <<'EOF'
             ## ✅ No issues found
@@ -243,6 +247,10 @@ jobs:
             - Brief overall assessment of the PR safety/quality
             - This PR is safe to merge (or note any minor observations)
             </details>
+            <details><summary><h3>Copilot Review Triage</h3></summary>
+            Triaged N Copilot comment(s): X resolved (fixed), Y dismissed (false positive), Z acknowledged (valid, left open).
+            - List each triaged comment with a one-line summary of the action taken
+            </details>
             <details><summary><h3>Important Files Changed</h3></summary>
             | Filename | Overview |
             |----------|----------|
@@ -251,6 +259,8 @@ jobs:
             EOF
             )"
             ```
+            Omit the "Copilot Review Triage" section entirely if no Copilot
+            threads were found in Step 4.
             The overall confidence score reflects how thoroughly the changes could be
             reviewed (5/5 = simple/clear changes fully understood, 3/5 = complex changes
             with areas that need human judgment).
