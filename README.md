@@ -4,7 +4,7 @@
 
 Reusable GitHub Actions workflows for the SBB Polarion team.
 
-This repository contains **only reusable workflow definitions**. It does not contain application code, libraries, or standalone tools. Other repositories in the organization call these workflows via `workflow_call`.
+This repository contains **GitHub Actions workflows (reusable and caller/CI)**. It does not contain application code, libraries, or standalone tools. Other repositories in the organization call the reusable workflows via `workflow_call`.
 
 ## Overview
 

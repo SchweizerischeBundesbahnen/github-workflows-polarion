@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-This repository contains **only reusable GitHub Actions workflows**. There is no application code, no build system, and no tests. All files of interest live under `.github/workflows/`.
+This repository contains **GitHub Actions workflows (reusable and caller/CI)**. There is no application code, no build system, and no tests. All files of interest live under `.github/workflows/`.
 
 ## Repository Structure
 

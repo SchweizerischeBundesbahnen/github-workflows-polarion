@@ -217,9 +217,11 @@ jobs:
                ```
             Do NOT skip this step. Old summaries clutter the PR conversation.
             STEP 7: Post a PR comment summary using `gh pr comment`.
-            You MUST use the EXACT HTML structure below — do NOT omit <details>
-            tags, do NOT replace the markdown table with a list, do NOT change
-            heading levels. Copy the template and only fill in the placeholders.
+            You MUST use the EXACT HTML structure below — do NOT replace the
+            markdown table with a list, do NOT change heading levels. Copy the
+            template and only fill in the placeholders.
+            EXCEPTION: The "Copilot Review Triage" <details> section MUST be
+            omitted entirely if no Copilot threads were found in Step 4.
             If issues were found:
             ```
             gh pr comment --repo ${{ github.repository }} ${{ github.event.pull_request.number }} --body "$(cat <<'EOF'
@@ -283,8 +285,6 @@ jobs:
             EOF
             )"
             ```
-            Omit the "Copilot Review Triage" section entirely if no Copilot
-            threads were found in Step 4.
             The overall confidence score reflects how thoroughly the changes could be
             reviewed (5/5 = simple/clear changes fully understood, 3/5 = complex changes
             with areas that need human judgment).
