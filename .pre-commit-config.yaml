@@ -1,0 +1,38 @@
+---
+default_install_hook_types: [pre-commit, commit-msg]
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=5120]
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: trailing-whitespace
+        exclude_types: [markdown]  # Avoid conflicts with markdown formatting
+      - id: check-json
+      - id: check-toml
+      - id: check-yaml
+      - id: mixed-line-ending
+      - id: end-of-file-fixer
+  - repo: https://github.com/zricethezav/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/grigoriev/pre-commit-check-git-user
+    rev: v0.9.3
+    hooks:
+      - id: check-git-config-user-email
+        args: [--templates, ^\S+\.\S+@sbb\.ch$]
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.13.9
+    hooks:
+      - id: commitizen
+  - repo: https://github.com/woodruffw/zizmor-pre-commit
+    rev: v1.23.1
+    hooks:
+      - id: zizmor
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.11
+    hooks:
+      - id: actionlint
