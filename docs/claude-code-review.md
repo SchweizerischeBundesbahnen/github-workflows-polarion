@@ -111,10 +111,10 @@ Each inline comment follows this format:
 
 | Emoji | Severity | Description |
 |-------|----------|-------------|
-| :red_circle: | Bug | Will break at runtime |
-| :orange_circle: | Security | Security vulnerability |
-| :yellow_circle: | Warning | Likely bug or risky pattern |
-| :large_blue_circle: | Convention | CLAUDE.md violation |
+| 🔴 | Bug | Will break at runtime |
+| 🟠 | Security | Security vulnerability |
+| 🟡 | Warning | Likely bug or risky pattern |
+| 🔵 | Convention | CLAUDE.md violation |
 
 ### Step 5: Minimize Outdated Summary Comments
 

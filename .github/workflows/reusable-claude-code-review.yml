@@ -150,9 +150,9 @@ jobs:
             Before posting a new summary, find and minimize all previous PR
             comments authored by claude[bot] that contain "Claude Code Review
             Summary" or "No issues found" or "No new issues found".
-            a) Fetch all issue comments on the PR:
-               `gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login == "claude[bot]") | {node_id, body}'`
-            b) For each matching comment, minimize it as outdated:
+            a) Fetch all issue comments on the PR (use --paginate to get all pages):
+               `gh api --paginate repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login == "claude[bot]" and (.body | test("Claude Code Review Summary|No issues found|No new issues found"))) | {node_id, body}'`
+            b) For each comment returned by the query above, minimize it as outdated:
                ```
                gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "COMMENT_NODE_ID", classifier: OUTDATED}) { minimizedComment { isMinimized } } }'
                ```
