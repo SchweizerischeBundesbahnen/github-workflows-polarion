@@ -1,0 +1,37 @@
+---
+name: ActionLint (reusable)
+on:
+  workflow_call:
+    inputs:
+      reporter:
+        description: "Reviewdog reporter: github-check, github-pr-review, github-pr-check"
+        required: false
+        type: string
+        default: github-check
+      fail_level:
+        description: "Fail level: error, warning, info"
+        required: false
+        type: string
+        default: error
+permissions: {}
+jobs:
+  actionlint:
+    name: Check GitHub Actions Workflows
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Run actionlint
+        uses: reviewdog/action-actionlint@0d952c597ef8459f634d7145b0b044a9699e5e43  # v1.71.0
+        with:
+          github_token: ${{ github.token }}
+          reporter: ${{ inputs.reporter }}
+          fail_level: ${{ inputs.fail_level }}
+          level: error
+          filter_mode: nofilter
