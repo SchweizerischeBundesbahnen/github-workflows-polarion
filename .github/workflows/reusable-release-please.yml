@@ -1,0 +1,65 @@
+---
+name: Release Please (reusable)
+on:
+  workflow_call:
+    inputs:
+      release-type:
+        description: "The release type: simple (Docker), python, maven, node, etc."
+        required: false
+        type: string
+        default: simple
+      include-v-in-tag:
+        description: Whether to include v prefix in tag (e.g. v1.0.0 vs 1.0.0)
+        required: false
+        type: boolean
+        default: true
+      target-branch:
+        description: The branch to create releases from
+        required: false
+        type: string
+        default: ""
+      config-file:
+        description: Path to release-please-config.json (overrides release-type)
+        required: false
+        type: string
+        default: ""
+      manifest-file:
+        description: Path to .release-please-manifest.json
+        required: false
+        type: string
+        default: ""
+    outputs:
+      release_created:
+        description: Whether a release was created
+        value: ${{ jobs.release-please.outputs.release_created }}
+      tag_name:
+        description: The tag name of the release
+        value: ${{ jobs.release-please.outputs.tag_name }}
+      version:
+        description: The version number of the release
+        value: ${{ jobs.release-please.outputs.version }}
+      upload_url:
+        description: The upload URL for release assets
+        value: ${{ jobs.release-please.outputs.upload_url }}
+permissions: {}
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+      upload_url: ${{ steps.release.outputs.upload_url }}
+    steps:
+      - name: Run Release Please
+        id: release
+        uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38  # v4.4.0
+        with:
+          release-type: ${{ inputs.config-file == '' && inputs.release-type || '' }}
+          include-v-in-tag: ${{ inputs.include-v-in-tag }}
+          target-branch: ${{ inputs.target-branch || github.ref_name }}
+          config-file: ${{ inputs.config-file || '' }}
+          manifest-file: ${{ inputs.manifest-file || '' }}

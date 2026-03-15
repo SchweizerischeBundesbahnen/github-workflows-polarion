@@ -1,0 +1,13 @@
+---
+name: Release Please
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions: {}
+jobs:
+  release-please:
+    uses: ./.github/workflows/reusable-release-please.yml
+    permissions:
+      contents: write
+      pull-requests: write

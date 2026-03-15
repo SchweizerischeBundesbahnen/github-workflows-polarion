@@ -19,6 +19,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 |----------|-------------|
 | `reusable-claude-code-review.yml` | AI-powered code review using Claude Code |
 | `reusable-add-issue-to-project.yml` | Automatically add new issues to a GitHub project board |
+| `reusable-release-please.yml` | Automated releases and changelogs using release-please (Maven, Python, Docker, etc.) |
 
 ## Usage
 
@@ -41,6 +42,44 @@ jobs:
       POLARION_GITHUB_APP_PRIVATE_KEY: ${{ secrets.POLARION_GITHUB_APP_PRIVATE_KEY }}
     with:
       project-number: ${{ vars.POLARION_GITHUB_PROJECT_NUMBER }}
+```
+
+```yaml
+# Maven project
+jobs:
+  release-please:
+    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-release-please.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      release-type: maven
+```
+
+```yaml
+# Python project
+jobs:
+  release-please:
+    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-release-please.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      release-type: python
+      include-v-in-tag: false
+```
+
+```yaml
+# Docker / simple project
+jobs:
+  release-please:
+    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-release-please.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      release-type: simple
+      include-v-in-tag: false
 ```
 
 Each reusable workflow has a corresponding caller workflow (e.g. `claude-code-review.yml`) that demonstrates how this repository itself uses it.
