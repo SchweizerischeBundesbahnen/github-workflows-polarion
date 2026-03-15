@@ -100,18 +100,22 @@ jobs:
             Do NOT skip this step even if you find no new issues.
             The confidence score in Step 7 MUST account for still-open issues from
             previous reviews — you cannot score 5/5 if unresolved issues remain.
-            STEP 4: Triage Copilot review comments.
-            First, wait for Copilot code review to finish. Check the PR's
-            check runs for "Copilot code review":
+            STEP 4: MANDATORY — Triage Copilot review comments.
+            You MUST execute this step. Do NOT skip it.
+            FIRST: Run this command RIGHT NOW before doing anything else:
             ```
             gh api repos/${{ github.repository }}/commits/${{ github.event.pull_request.head.sha }}/check-runs --jq '.check_runs[] | select(.name == "Copilot code review") | {status, conclusion}'
             ```
-            - If no result: Copilot is not enabled. Skip waiting and proceed
-              to triage any existing threads from previous commits.
-            - If status is "queued" or "in_progress": poll every 30 seconds
-              (up to 5 minutes max) until status is "completed", then proceed.
+            Then follow these rules based on the output:
+            - If the command returns EMPTY output: Copilot is not enabled.
+              Proceed to triage any existing threads from previous commits.
+            - If status is "queued" or "in_progress": you MUST wait. Run the
+              same command every 30 seconds until status becomes "completed".
+              Maximum wait: 5 minutes (10 retries). Do NOT proceed until
+              Copilot is done or the timeout is reached.
             - If status is "completed": proceed immediately.
-            If no Copilot threads exist after checking, skip to Step 5.
+            After waiting (or if Copilot is not enabled), check for unresolved
+            Copilot threads. If none exist, skip to Step 5.
             a) Fetch all unresolved review threads on this PR and filter for
                those authored by Copilot:
                ```
