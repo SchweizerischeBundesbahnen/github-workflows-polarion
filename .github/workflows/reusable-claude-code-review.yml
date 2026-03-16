@@ -83,12 +83,14 @@ jobs:
 
             4. MANDATORY — Triage Copilot review comments.
             Check Copilot status:
-            `gh api repos/${{ github.repository }}/commits/${{ github.event.pull_request.head.sha }}/check-runs --jq '.check_runs[] | select(.name == "Copilot code review") | {status, conclusion}'`
+            `gh api repos/${{ github.repository }}/commits/COMMIT_SHA/check-runs --jq '.check_runs[] | select(.name == "Copilot code review") | {status, conclusion}'`
             If empty output, Copilot is not enabled — still triage any existing
             Copilot threads from previous commits. If in_progress, poll every
-            30s (max 5 min). Then fetch unresolved Copilot threads (filter
-            comments from step 2 where user.login is "Copilot"). For each,
-            read the CURRENT file content and classify:
+            30s (max 5 min). Then find unresolved Copilot threads: filter
+            GraphQL reviewThreads where isResolved == false and first comment
+            author is "copilot-pull-request-reviewer". Cross-reference with
+            REST comments (from step 2) to get COMMENT_ID and node_id for
+            mutations. For each, read the CURRENT file content and classify:
             - FIXED: reply, resolve, and minimize:
               `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/COMMENT_ID/replies --method POST -f body="Fixed — this issue has been addressed in the current code."`
               `gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'`
