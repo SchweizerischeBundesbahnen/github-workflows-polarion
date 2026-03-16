@@ -42,7 +42,8 @@ flowchart TD
   A(PR opened, pushed, or ready) --> B(Author is bot or fork)
   B -->|Yes| Z(Workflow skipped)
   B -->|No| C(Checkout repository)
-  C --> D(Shell step: Minimize outdated Claude comments)
+  C --> C2(Shell: Minimize outdated Claude comments)
+  C2 --> D(Shell: Resolve duplicate Copilot threads)
   D --> E(Step 1: Read CLAUDE.md and project conventions)
   E --> F(Step 2: Get PR diff + fetch previous comments and threads)
   F --> G(Step 3: Process previous claude bot review threads)
@@ -51,9 +52,14 @@ flowchart TD
   I --> J(Step 6: Post PR summary comment)
 ```
 
-### Pre-step: Minimize Outdated Comments (shell)
+### Pre-steps: Cleanup (shell)
 
-A dedicated shell step (not part of the Claude prompt) runs **before** the review. It finds all previous PR comments authored by `claude[bot]` that match summary or tracking patterns and minimizes them as outdated. This is a shell script, not a Claude instruction, so it always runs regardless of what Claude decides to do.
+Two dedicated shell steps run **before** the Claude review:
+
+1. **Minimize outdated Claude comments** — finds all previous `claude[bot]` PR comments matching summary or tracking patterns and minimizes them as outdated
+2. **Resolve duplicate Copilot threads** — Copilot re-posts the same findings on every push. This step keeps only the newest unresolved thread per path+line and resolves older duplicates
+
+These are shell scripts, not Claude instructions, so they always run regardless of what Claude decides to do.
 
 ### Step 1: Learn Project Context
 
@@ -160,7 +166,7 @@ When a developer pushes fixes after a review:
 ```mermaid
 flowchart TD
   A(Developer pushes fix) --> B(Workflow triggers on synchronize)
-  B --> C(Shell step: Minimize old Claude comments)
+  B --> C(Shell: Minimize old Claude comments + resolve duplicate Copilot threads)
   C --> D(Get full PR diff + previous comments)
   D --> E{Previous Claude issue status}
   E -->|Fixed| F(Resolve thread + minimize as outdated)
