@@ -93,77 +93,14 @@ jobs:
                gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "COMMENT_NODE_ID", classifier: OUTDATED}) { minimizedComment { isMinimized } } }'
                ```
             B) STILL PRESENT — the issue was NOT fixed. Leave the thread open.
-               Count it as an open issue in your Step 7 summary.
+               Count it as an open issue in your Step 5 summary.
             C) ALREADY RESOLVED — skip, no action needed.
             Use the thread `id` from the reviewThreads query and the `node_id` from
             the comments REST API response fetched in step 2b.
             Do NOT skip this step even if you find no new issues.
-            The confidence score in Step 7 MUST account for still-open issues from
+            The confidence score in Step 5 MUST account for still-open issues from
             previous reviews — you cannot score 5/5 if unresolved issues remain.
-            STEP 4: MANDATORY — Triage Copilot review comments.
-            You MUST execute this step. Do NOT skip it.
-            FIRST: Run this command RIGHT NOW before doing anything else:
-            ```
-            gh api repos/${{ github.repository }}/commits/${{ github.event.pull_request.head.sha }}/check-runs --jq '.check_runs[] | select(.name == "Copilot code review") | {status, conclusion}'
-            ```
-            Then follow these rules based on the output:
-            - If the command returns EMPTY output: Copilot is not enabled.
-              Proceed to triage any existing threads from previous commits.
-            - If status is "queued" or "in_progress": you MUST wait. Run the
-              same command every 30 seconds until status becomes "completed".
-              Maximum wait: 5 minutes (10 retries). Do NOT proceed until
-              Copilot is done or the timeout is reached.
-            - If status is "completed": proceed immediately.
-            After waiting (or if Copilot is not enabled), check for unresolved
-            Copilot threads. If none exist, skip to Step 5.
-            a) Fetch all unresolved review threads on this PR and filter for
-               those authored by Copilot:
-               ```
-               gh api graphql -f query='query {
-                 repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
-                   pullRequest(number: ${{ github.event.pull_request.number }}) {
-                     reviewThreads(first: 100) {
-                       nodes {
-                         id
-                         isResolved
-                         comments(first: 1) {
-                           nodes { author { login } body path line }
-                         }
-                       }
-                     }
-                   }
-                 }
-               }'
-               ```
-               Filter the results: ONLY include threads where
-               isResolved == false AND author login is "Copilot".
-               SKIP all threads where isResolved == true — these were
-               already handled (by a human or a previous review run).
-               Do NOT report resolved threads in the summary.
-            b) Also fetch comment node_ids for the Copilot comments:
-               `gh api --paginate repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login == "Copilot") | {id, node_id, path, line, body}'`
-            c) For each UNRESOLVED Copilot thread (isResolved == false
-               ONLY), read the CURRENT file content and classify:
-               A) FIXED — the issue no longer exists. Reply explaining it was
-                  fixed and resolve the thread:
-                  ```
-                  gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/COMMENT_ID/replies --method POST -f body="Fixed — this issue has been addressed in the current code."
-                  gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
-                  gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "COMMENT_NODE_ID", classifier: OUTDATED}) { minimizedComment { isMinimized } } }'
-                  ```
-               B) VALID — the finding is correct and actionable. Leave thread
-                  open. Count it in the Step 7 summary.
-               C) FALSE POSITIVE — the finding is incorrect or irrelevant.
-                  Reply with a short explanation of why and resolve the thread:
-                  ```
-                  gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/COMMENT_ID/replies --method POST -f body="Dismissed — <reason why this is not applicable>."
-                  gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
-                  ```
-            IMPORTANT: Critically evaluate each Copilot finding. Do NOT treat
-            all findings as valid. Dismiss cosmetic nitpicks, style preferences,
-            and findings that don't apply to this repo. Only acknowledge findings
-            that identify real bugs, security issues, or meaningful improvements.
-            STEP 5: Submit your review as INLINE COMMENTS on the specific lines where
+            STEP 4: Submit your review as INLINE COMMENTS on the specific lines where
             issues are found, using the GitHub Pull Request Review API.
             To submit, pipe JSON via stdin to `gh api --input -`:
             ```
@@ -209,24 +146,12 @@ jobs:
             ...code example...
             </details>
             ```
-            STEP 6: MANDATORY — Minimize outdated Claude summary comments.
-            Before posting a new summary, find and minimize all previous PR
-            comments authored by claude[bot] that contain "Claude Code Review
-            Summary" or "No issues found" or "No new issues found".
-            a) Fetch all issue comments on the PR (use --paginate to get all pages):
-               `gh api --paginate repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login == "claude[bot]" and (.body | test("Claude Code Review Summary|No issues found|No new issues found"))) | {node_id, body}'`
-            b) For each comment returned by the query above, minimize it as outdated:
-               ```
-               gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "COMMENT_NODE_ID", classifier: OUTDATED}) { minimizedComment { isMinimized } } }'
-               ```
-            Do NOT skip this step. Old summaries clutter the PR conversation.
-            STEP 7: Post a PR comment summary using `gh pr comment`.
-            You MUST use the EXACT HTML structure below — do NOT replace the
-            markdown table with a list, do NOT change heading levels. Copy the
-            template and only fill in the placeholders.
-            EXCEPTION: The "Copilot Review Triage" <details> section MUST be
-            omitted entirely if no Copilot threads were found in Step 4.
-            If issues were found:
+            STEP 5: Post a PR comment summary using `gh pr comment`.
+            Minimize all previous Claude summary comments first:
+            `gh api --paginate repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login == "claude[bot]" and (.body | test("Claude Code Review Summary|No issues found"))) | {node_id}'`
+            For each, minimize as outdated:
+            `gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "NODE_ID", classifier: OUTDATED}) { minimizedComment { isMinimized } } }'`
+            Then post the summary. If issues were found:
             ```
             gh pr comment --repo ${{ github.repository }} ${{ github.event.pull_request.number }} --body "$(cat <<'EOF'
             ## Claude Code Review Summary
@@ -235,10 +160,6 @@ jobs:
             - Brief overall assessment of the PR safety/quality
             - Note any files that require special attention
             </details>
-            <details><summary><h3>Copilot Review Triage</h3></summary>
-            Triaged N Copilot comment(s): X resolved (fixed), Y dismissed (false positive), Z acknowledged (valid, left open).
-            - List each triaged comment with a one-line summary of the action taken
-            </details>
             <details><summary><h3>Important Files Changed</h3></summary>
             | Filename | Overview |
             |----------|----------|
@@ -247,7 +168,7 @@ jobs:
             EOF
             )"
             ```
-            If NO Claude issues found AND no valid Copilot findings left open:
+            If NO issues found:
             ```
             gh pr comment --repo ${{ github.repository }} ${{ github.event.pull_request.number }} --body "$(cat <<'EOF'
             ## ✅ No issues found
@@ -255,31 +176,6 @@ jobs:
             <details><summary><h3>Confidence Score: X/5</h3></summary>
             - Brief overall assessment of the PR safety/quality
             - This PR is safe to merge (or note any minor observations)
-            </details>
-            <details><summary><h3>Copilot Review Triage</h3></summary>
-            Triaged N Copilot comment(s): X resolved (fixed), Y dismissed (false positive), Z acknowledged (valid, left open).
-            - List each triaged comment with a one-line summary of the action taken
-            </details>
-            <details><summary><h3>Important Files Changed</h3></summary>
-            | Filename | Overview |
-            |----------|----------|
-            | `path/to/file.py` | Brief description of changes |
-            </details>
-            EOF
-            )"
-            ```
-            If NO Claude issues found BUT valid Copilot findings were left open:
-            ```
-            gh pr comment --repo ${{ github.repository }} ${{ github.event.pull_request.number }} --body "$(cat <<'EOF'
-            ## ℹ️ No new issues found — Z Copilot finding(s) acknowledged
-            No additional issues beyond what Copilot already flagged.
-            <details><summary><h3>Confidence Score: X/5</h3></summary>
-            - Brief overall assessment of the PR safety/quality
-            - Note that open Copilot findings still need human review
-            </details>
-            <details><summary><h3>Copilot Review Triage</h3></summary>
-            Triaged N Copilot comment(s): X resolved (fixed), Y dismissed (false positive), Z acknowledged (valid, left open).
-            - List each triaged comment with a one-line summary of the action taken
             </details>
             <details><summary><h3>Important Files Changed</h3></summary>
             | Filename | Overview |

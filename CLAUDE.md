@@ -7,7 +7,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 ## Repository Structure
 
 - `.github/workflows/reusable-*.yml` — Reusable workflows called by other repositories via `workflow_call`
-- `.github/workflows/*.yml` (non-reusable) — Caller workflows that this repo uses itself, plus CI workflows (actionlint, PR checks, labeler, stale)
+- `.github/workflows/*.yml` (non-reusable) — Caller workflows that this repo uses itself, plus CI workflows (actionlint, PR checks, labeler, stale, claude-code-review-triage)
 
 ## Conventions
 
@@ -22,6 +22,11 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 
 - Reusable workflows: `reusable-<name>.yml` with trigger `workflow_call`
 - Caller workflows: `<name>.yml` that reference the reusable version via `uses:`
+
+## Review Architecture
+
+- Claude Code Review (`reusable-claude-code-review.yml`) runs on `pull_request` events — focuses on code review only (5 steps)
+- Review triage (`reusable-claude-code-review-triage.yml`) runs on `pull_request_review` events — triggered when a reviewer (Copilot, Greptile, etc.) submits its review, triages findings separately
 
 ## Pre-commit
 

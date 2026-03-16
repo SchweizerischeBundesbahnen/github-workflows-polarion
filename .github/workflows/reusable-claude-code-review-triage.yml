@@ -1,0 +1,115 @@
+---
+name: Claude Code Review Triage (reusable)
+on:
+  workflow_call:
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: true
+permissions: {}
+jobs:
+  triage:
+    if: github.event.review.user.login == 'copilot-pull-request-reviewer[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Triage Copilot review comments
+        uses: anthropics/claude-code-action@26ec041249acb0a944c0a47b6c0c13f05dbc5b44  # v1.0.70
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Copilot has just submitted a code review on this PR. Your job is
+            to triage its findings — resolve fixed issues, dismiss false
+            positives, and acknowledge valid ones.
+
+            STEP 1: Read CLAUDE.md to understand project conventions.
+
+            STEP 2: Fetch all unresolved Copilot review threads:
+            ```
+            gh api graphql -f query='query {
+              repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
+                pullRequest(number: ${{ github.event.pull_request.number }}) {
+                  reviewThreads(first: 100) {
+                    nodes {
+                      id
+                      isResolved
+                      comments(first: 1) {
+                        nodes { author { login } body path line }
+                      }
+                    }
+                  }
+                }
+              }
+            }'
+            ```
+            Filter: only threads where isResolved == false AND author login
+            is "Copilot". Skip all resolved threads.
+
+            Also fetch comment node_ids:
+            `gh api --paginate repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login == "Copilot") | {id, node_id, path, line, body}'`
+
+            STEP 3: For each unresolved Copilot thread, read the current file
+            and classify:
+
+            A) FIXED — issue no longer exists. Reply and resolve:
+               ```
+               gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/COMMENT_ID/replies --method POST -f body="Fixed — this issue has been addressed in the current code."
+               gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
+               gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "COMMENT_NODE_ID", classifier: OUTDATED}) { minimizedComment { isMinimized } } }'
+               ```
+
+            B) VALID — finding is correct and actionable. Leave open.
+
+            C) FALSE POSITIVE — finding is incorrect or irrelevant. Reply
+               with explanation and resolve:
+               ```
+               gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/COMMENT_ID/replies --method POST -f body="Dismissed — <reason>."
+               gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
+               ```
+
+            IMPORTANT: Be critical. Dismiss cosmetic nitpicks and style
+            preferences. Only acknowledge findings that identify real bugs,
+            security issues, or meaningful improvements.
+
+            STEP 4: Post a summary comment:
+            ```
+            gh pr comment --repo ${{ github.repository }} ${{ github.event.pull_request.number }} --body "$(cat <<'EOF'
+            ## Copilot Review Triage
+            Triaged **N** Copilot comment(s): **X** resolved, **Y** dismissed, **Z** acknowledged.
+            <details><summary>Details</summary>
+
+            | File | Finding | Action |
+            |------|---------|--------|
+            | `path/file` | One-line summary | Resolved / Dismissed / Acknowledged |
+
+            </details>
+            EOF
+            )"
+            ```
+            If no unresolved Copilot threads were found, do NOT post anything.
+            Only post GitHub comments — don't submit text as messages.
+          settings: |
+            {
+              "permissions": {
+                "allow": [
+                  "Read", "Grep", "Glob", "BatchTool",
+                  "Bash(gh pr comment:*)",
+                  "Bash(gh pr diff:*)",
+                  "Bash(gh pr view:*)",
+                  "Bash(gh api:*)"
+                ]
+              }
+            }
+          claude_args: --max-turns 15
