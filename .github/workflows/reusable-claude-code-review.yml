@@ -43,50 +43,6 @@ jobs:
                 }
               }"
           done
-      - name: Resolve duplicate Copilot review threads
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO_OWNER: ${{ github.repository_owner }}
-          REPO_NAME: ${{ github.event.repository.name }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          # Copilot re-posts findings on every push. Keep only the newest
-          # unresolved thread per path+line, resolve older duplicates.
-          # shellcheck disable=SC2016
-          gh api graphql \
-            -f owner="$REPO_OWNER" \
-            -f name="$REPO_NAME" \
-            -F number="$PR_NUMBER" \
-            -f query='query($owner: String!, $name: String!, $number: Int!) {
-              repository(owner: $owner, name: $name) {
-                pullRequest(number: $number) {
-                  reviewThreads(first: 100) {
-                    nodes {
-                      id
-                      isResolved
-                      comments(first: 1) {
-                        nodes { author { login } path line createdAt }
-                      }
-                    }
-                  }
-                }
-              }
-            }' --jq '[.data.repository.pullRequest.reviewThreads.nodes[]
-              | select(.isResolved == false and .comments.nodes[0].author.login == "copilot-pull-request-reviewer")
-              | {id, path: .comments.nodes[0].path, line: .comments.nodes[0].line, createdAt: .comments.nodes[0].createdAt}]
-              | group_by(.path + ":" + (.line | tostring))
-              | .[]
-              | sort_by(.createdAt)
-              | .[:-1]
-              | .[].id' | while read -r thread_id; do
-              echo "Resolving duplicate Copilot thread $thread_id"
-              gh api graphql -f query="
-                mutation {
-                  resolveReviewThread(input: {threadId: \"$thread_id\"}) {
-                    thread { isResolved }
-                  }
-                }"
-          done
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@5d0cc745cd0cce4c0e9e0b3511de26c3bc285eb5  # v1.0.71
