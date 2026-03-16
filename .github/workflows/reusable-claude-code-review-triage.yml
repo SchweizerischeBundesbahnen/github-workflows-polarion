@@ -2,18 +2,12 @@
 name: Claude Code Review Triage (reusable)
 on:
   workflow_call:
-    inputs:
-      reviewer-login:
-        description: The login of the reviewer who submitted the review
-        required: true
-        type: string
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         required: true
 permissions: {}
 jobs:
   triage:
-    if: contains(inputs.reviewer-login, '[bot]') && inputs.reviewer-login != 'claude[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -60,9 +54,11 @@ jobs:
               }
             }'
             ```
-            Filter: only threads where isResolved == false AND author login
-            is NOT "claude[bot]" (skip Claude's own threads and all resolved
-            threads).
+            Filter for triaging: only threads where isResolved == false AND
+            author login is NOT "claude[bot]". Do NOT triage Claude's own
+            threads (humans decide on those).
+            Also note any unresolved claude[bot] threads — you will list
+            them in the summary (Step 4) but not take action on them.
 
             Also fetch comment node_ids:
             `gh api --paginate repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login != "claude[bot]") | {id, node_id, path, line, body, user: .user.login}'`
@@ -100,6 +96,7 @@ jobs:
             | File | Reviewer | Finding | Action |
             |------|----------|---------|--------|
             | `path/file` | @reviewer | One-line summary | Resolved / Dismissed / Acknowledged |
+            | `path/file` | @claude | One-line summary | Open (not triaged) |
 
             </details>
             EOF
