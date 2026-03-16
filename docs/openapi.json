@@ -3,7 +3,11 @@
   "info": {
     "title": "github-workflows-polarion",
     "description": "Example OpenAPI spec for workflow validation testing",
-    "version": "0.0.1"
+    "version": "0.0.1",
+    "license": {
+      "name": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    }
   },
   "paths": {}
 }
