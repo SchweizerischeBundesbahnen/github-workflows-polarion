@@ -35,19 +35,25 @@ Only one review runs per PR at a time. If a new push arrives while a review is i
 
 ## Review Process
 
+The steps are ordered so that all housekeeping (minimization, thread processing, triage) runs before the "find issues" analysis phase. This prevents Claude from short-circuiting when it finds no new issues.
+
 ```mermaid
 flowchart TD
   A(PR opened, pushed, or ready) --> B(Author is bot or fork)
   B -->|Yes| Z(Workflow skipped)
   B -->|No| C(Checkout repository)
-  C --> D(Step 1: Read CLAUDE.md and project conventions)
-  D --> E(Step 2: Get PR diff + fetch previous comments)
-  E --> F(Step 3: Process previous claude bot review threads)
-  F --> G(Step 4: Triage Copilot review comments)
-  G --> H(Step 5: Analyze diff and post inline comments)
-  H --> I(Step 6: Minimize outdated claude summary comments)
-  I --> J(Step 7: Post PR summary comment)
+  C --> D(Shell: Minimize outdated Claude comments)
+  D --> E(Step 1: Read CLAUDE.md and project conventions)
+  E --> F(Step 2: Get PR diff + fetch previous comments and threads)
+  F --> G(Step 3: Process previous claude bot review threads)
+  G --> H(Step 4: Triage Copilot review comments)
+  H --> I(Step 5: Analyze diff and post inline comments)
+  I --> J(Step 6: Post PR summary comment)
 ```
+
+### Pre-step: Minimize Outdated Comments (shell)
+
+A dedicated shell step (not part of the Claude prompt) runs **before** the review. It finds all previous PR comments authored by `claude[bot]` that match summary or tracking patterns and minimizes them as outdated. This is a shell script, not a Claude instruction, so it always runs regardless of what Claude decides to do.
 
 ### Step 1: Learn Project Context
 
@@ -56,11 +62,11 @@ Claude reads `CLAUDE.md` and referenced files to understand code conventions, ar
 ### Step 2: Gather Review Context
 
 - **Full PR diff** — reviews the complete diff (not just the last commit)
-- **Previous review comments** — fetches prior comments and review threads from `claude[bot]` to avoid duplicates
+- **Previous review comments** — fetches prior comments and review threads (both `claude[bot]` and `Copilot`) via REST API and GraphQL to avoid duplicates and enable thread processing
 
 ### Step 3: Process Previous Review Threads
 
-For every unresolved review thread authored by `claude[bot]`:
+For every unresolved review thread authored by `claude[bot]`, Claude reads the **current file content** (not just the diff) to determine if the issue still exists:
 
 | Classification | Action |
 |---------------|--------|
@@ -72,6 +78,8 @@ For every unresolved review thread authored by `claude[bot]`:
 
 Claude checks if a Copilot code review check run exists for the current commit. If running, it polls every 30 seconds (up to 5 minutes) until complete. If Copilot is not enabled, it skips waiting and triages any existing threads from previous commits.
 
+For each unresolved Copilot thread, Claude reads the **current file content** and classifies:
+
 | Classification | Action |
 |---------------|--------|
 | **Fixed** | Reply explaining it's fixed, resolve and minimize as outdated |
@@ -82,14 +90,14 @@ Claude critically evaluates each finding — cosmetic nitpicks and style prefere
 
 ### Step 5: Analyze and Post Inline Comments
 
-Claude reviews each changed line, focusing on:
+Claude reviews each changed line using `mcp__github_inline_comment__create_inline_comment` (built-in MCP tool, no Docker required), focusing on:
 
 | Category | Examples |
 |----------|----------|
 | Bugs / logic errors | Use-before-assignment, off-by-one, unreachable code |
 | Security vulnerabilities | SQL injection, XSS, auth bypass, secrets exposure |
 | Breaking changes | Signature changes, removed public API, not mentioned in PR |
-| CLAUDE.md violations | Convention violations (cite the specific rule) |
+| CLAUDE.md violations | Convention violations (must cite the specific rule) |
 | Missing error handling | Unhandled exceptions in new code paths |
 | Missing tests | New functionality without corresponding tests |
 | Performance issues | N+1 queries, unnecessary allocations in hot paths |
@@ -106,17 +114,7 @@ Each inline comment follows this format:
 <details>
 <summary>Extended reasoning...</summary>
 
-## What the bug is
-...detailed explanation...
-
-## Step-by-step proof
-1. ...
-
-## Impact
-...
-
-## How to fix
-...code example...
+Detailed explanation of the issue, proof, impact, and fix.
 </details>
 ```
 
@@ -129,11 +127,7 @@ Each inline comment follows this format:
 | :yellow_circle: | Warning | Likely bug or risky pattern |
 | :large_blue_circle: | Convention | CLAUDE.md violation |
 
-### Step 6: Minimize Outdated Summary Comments
-
-Before posting a new summary, Claude finds all previous PR comments authored by `claude[bot]` that match the summary format and minimizes them as outdated. This prevents stale summaries from cluttering the PR conversation.
-
-### Step 7: Post PR Summary Comment
+### Step 6: Post PR Summary Comment
 
 A summary comment is posted on the PR. The heading varies based on findings:
 
@@ -143,10 +137,10 @@ A summary comment is posted on the PR. The heading varies based on findings:
 | No issues, no open Copilot findings | `## ✅ No issues found` |
 | No Claude issues, but valid Copilot findings left open | `## ℹ️ No new issues found — Z Copilot finding(s) acknowledged` |
 
-Each summary includes:
+Each summary includes collapsible sections:
 
-- Confidence score (1-5)
-- Copilot Review Triage section (if Copilot threads were found)
+- Confidence score (1-5) with brief assessment
+- Copilot Review Triage (omitted if no Copilot threads were found)
 - Table of important files changed
 
 **Confidence scale:**
@@ -166,16 +160,16 @@ When a developer pushes fixes after a review:
 ```mermaid
 flowchart TD
   A(Developer pushes fix) --> B(Workflow triggers on synchronize)
-  B --> C(Get full PR diff + previous comments)
-  C --> D{Previous Claude issue status}
-  D -->|Fixed| E(Resolve thread + minimize as outdated)
-  D -->|Still present| F(Leave thread open)
-  D -->|New issue| G(Post new inline comment)
-  E --> CP(Triage Copilot comments)
-  F --> CP
-  G --> CP
-  CP --> H(Minimize old summary comments)
-  H --> I(Post updated summary)
+  B --> C(Shell: Minimize old Claude comments)
+  C --> D(Get full PR diff + previous comments)
+  D --> E{Previous Claude issue status}
+  E -->|Fixed| F(Resolve thread + minimize as outdated)
+  E -->|Still present| G(Leave thread open)
+  D --> H(Triage Copilot comments)
+  F --> I(Analyze diff for new issues)
+  G --> I
+  H --> I
+  I --> J(Post updated summary)
 ```
 
 ## Permissions
@@ -192,10 +186,11 @@ The caller workflow must grant these permissions:
 Claude's tool access is restricted to:
 
 - `Read`, `Grep`, `Glob`, `BatchTool` — codebase exploration (read-only)
+- `mcp__github_inline_comment__create_inline_comment` — post inline review comments (built-in MCP tool)
 - `Bash(gh pr comment:*)` — post PR summary comments
 - `Bash(gh pr diff:*)` — read PR diff
 - `Bash(gh pr view:*)` — read PR metadata
-- `Bash(gh api:*)` — submit inline review comments and manage threads
+- `Bash(gh api:*)` — manage review threads and comments
 
 No write access to the repository. No ability to run builds, tests, or modify files.
 
@@ -229,3 +224,4 @@ jobs:
 - **Secret required**: `CLAUDE_CODE_OAUTH_TOKEN`
 - **Timeout**: 30 minutes per review
 - **Max turns**: 30
+- **Progress tracking**: `track_progress: true` — shows visual "In progress" → "Completed" status
