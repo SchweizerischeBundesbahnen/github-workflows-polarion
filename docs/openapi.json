@@ -1,0 +1,9 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "github-workflows-polarion",
+    "description": "Example OpenAPI spec for workflow validation testing",
+    "version": "0.0.1"
+  },
+  "paths": {}
+}
