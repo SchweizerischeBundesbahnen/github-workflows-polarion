@@ -1,0 +1,56 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "github-workflows-polarion REST API",
+    "version": "v1",
+    "license": {
+      "name": "Apache-2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.example.com"
+    }
+  ],
+  "paths": {
+    "/api/version": {
+      "get": {
+        "operationId": "getVersion",
+        "security": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Version"
+                }
+              }
+            },
+            "description": "Version information"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "summary": "Returns version information",
+        "tags": [
+          "Info"
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Version": {
+        "description": "Version details",
+        "properties": {
+          "version": {
+            "description": "The version string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    }
+  }
+}
