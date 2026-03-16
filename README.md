@@ -21,6 +21,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 | `reusable-claude-code-review.yml` | AI-powered code review using Claude Code |
 | `reusable-add-issue-to-project.yml` | Automatically add new issues to a GitHub project board |
 | `reusable-pr.yml` | PR checks with conventional commit validation |
+| `reusable-openapi-validation.yml` | OpenAPI spec validation using Redocly CLI |
 | `reusable-release-please.yml` | Automated releases and changelogs using release-please (Maven, Python, Docker, etc.) |
 
 ## Usage

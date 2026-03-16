@@ -1,0 +1,14 @@
+---
+name: OpenAPI Validation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  validate-openapi:
+    uses: ./.github/workflows/reusable-openapi-validation.yml
+    permissions:
+      contents: read
+    with:
+      spec-path: docs/openapi.json
