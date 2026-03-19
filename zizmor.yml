@@ -4,3 +4,7 @@ rules:
   # which prevents untrusted workflows from accessing secrets without explicit approval.
   secrets-outside-env:
     ignore: [claude-code-review.yml, reusable-claude-code-review.yml]
+  # claude-code-action needs git credentials for internal PR branch fetch.
+  # Risk is minimal: runner is ephemeral and token expires with the workflow.
+  artipacked:
+    ignore: [reusable-claude-code-review.yml]
