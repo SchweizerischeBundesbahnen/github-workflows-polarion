@@ -46,7 +46,7 @@ flowchart TD
   D --> E(Step 1: Read CLAUDE.md and project conventions)
   E --> F(Step 2: Get PR diff + fetch previous comments and threads)
   F --> G(Step 3: Process previous claude bot review threads)
-  G --> H(Step 4: Triage Copilot review comments)
+  G --> H(Step 4: Triage bot reviewer comments)
   H --> I(Step 5: Analyze diff and post inline comments)
   I --> J(Step 6: Post PR summary comment)
 ```
@@ -62,7 +62,7 @@ Claude reads `CLAUDE.md` and referenced files to understand code conventions, ar
 ### Step 2: Gather Review Context
 
 - **Full PR diff** — reviews the complete diff (not just the last commit)
-- **Previous review comments** — fetches prior comments and review threads (both `claude[bot]` and `Copilot`) via REST API and GraphQL to avoid duplicates and enable thread processing
+- **Previous review comments** — fetches prior comments and review threads (both `claude[bot]` and bot reviewers like Copilot, Greptile) via REST API and GraphQL to avoid duplicates and enable thread processing
 
 ### Step 3: Process Previous Review Threads
 
@@ -74,11 +74,11 @@ For every unresolved review thread authored by `claude[bot]`, Claude reads the *
 | **Still present** | Leave thread open, count in summary |
 | **Already resolved** | Skip |
 
-### Step 4: Triage Copilot Review Comments
+### Step 4: Triage Bot Reviewer Comments (Copilot, Greptile, etc.)
 
-Claude checks if a Copilot code review check run exists for the current commit. If running, it polls every 30 seconds (up to 5 minutes) until complete. If Copilot is not enabled, it skips waiting and triages any existing threads from previous commits.
+Claude triages comments from all bot reviewers. For Copilot specifically, it first checks if the check run exists and polls every 30 seconds (up to 5 minutes) if still running. Then it finds all unresolved review threads where the author login contains `[bot]` (excluding `claude[bot]`), covering Copilot, Greptile, and any future bot reviewer.
 
-For each unresolved Copilot thread, Claude reads the **current file content** and classifies:
+For each unresolved bot reviewer thread, Claude reads the **current file content** and classifies:
 
 | Classification | Action |
 |---------------|--------|
@@ -134,13 +134,13 @@ A summary comment is posted on the PR. The heading varies based on findings:
 | Scenario | Heading |
 |----------|---------|
 | Claude found issues | `## Claude Code Review Summary` |
-| No issues, no open Copilot findings | `## ✅ No issues found` |
-| No Claude issues, but valid Copilot findings left open | `## ℹ️ No new issues found — Z Copilot finding(s) acknowledged` |
+| No issues, no open bot reviewer findings | `## ✅ No issues found` |
+| No Claude issues, but valid bot reviewer findings left open | `## ℹ️ No new issues found — Z bot reviewer finding(s) acknowledged` |
 
 Each summary includes collapsible sections:
 
 - Confidence score (1-5) with brief assessment
-- Copilot Review Triage (omitted if no Copilot threads were found)
+- Bot Review Triage (omitted if no bot reviewer threads were found)
 - Table of important files changed
 
 **Confidence scale:**
@@ -165,7 +165,7 @@ flowchart TD
   D --> E{Previous Claude issue status}
   E -->|Fixed| F(Resolve thread + minimize as outdated)
   E -->|Still present| G(Leave thread open)
-  D --> H(Triage Copilot comments)
+  D --> H(Triage bot reviewer comments)
   F --> I(Analyze diff for new issues)
   G --> I
   H --> I
