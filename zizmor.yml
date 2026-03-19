@@ -5,6 +5,6 @@ rules:
   secrets-outside-env:
     ignore: [claude-code-review.yml, reusable-claude-code-review.yml]
   # claude-code-action needs git credentials for internal PR branch fetch.
-  # Risk is minimal: token is read-only (contents: read) and runner is ephemeral.
+  # Risk is minimal: runner is ephemeral and token expires with the workflow.
   artipacked:
     ignore: [reusable-claude-code-review.yml]
