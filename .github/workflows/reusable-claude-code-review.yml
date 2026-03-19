@@ -107,14 +107,15 @@ jobs:
             first comment author login does NOT contain "[bot]" and is NOT
             "claude[bot]" and is NOT "${{ github.event.pull_request.user.login }}"
             (the PR author). Cross-reference with REST comments (from step 2)
-            to get COMMENT_ID and node_id for mutations. For each, read the
-            CURRENT file content and classify:
+            to get COMMENT_ID for replies and thread id for resolve mutations.
+            For each, read the CURRENT file content and classify:
             - FIXED: reply acknowledging the fix, then resolve:
               `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/COMMENT_ID/replies --method POST -f body="Thanks — this has been addressed in the current code."`
               `gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'`
-            - VALID: acknowledge the comment and leave open for the PR author
-              to address. Do NOT resolve valid human comments — only humans
-              should resolve human feedback.
+            - VALID: reply acknowledging the feedback, then leave open for
+              the PR author to address. Do NOT resolve valid human comments
+              — only humans should resolve human feedback.
+              `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/COMMENT_ID/replies --method POST -f body="Acknowledged — flagging for the PR author to address."`
             - ALREADY RESOLVED: skip
             Human reviewer comments are high-signal — treat them with respect.
             Do NOT dismiss human comments as false positives or cosmetic nitpicks.

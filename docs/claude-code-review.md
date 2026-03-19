@@ -153,7 +153,7 @@ A summary comment is posted on the PR. The heading varies based on findings:
 | Scenario | Heading |
 |----------|---------|
 | Claude found issues | `## Claude Code Review Summary` |
-| No issues, no open bot reviewer findings | `## ✅ No issues found` |
+| No issues, no open bot/human reviewer findings | `## ✅ No issues found` |
 | No Claude issues, but valid bot/human reviewer findings left open | `## ℹ️ No new issues found — N bot reviewer finding(s) and M human reviewer finding(s) acknowledged` |
 
 Each summary includes collapsible sections:
