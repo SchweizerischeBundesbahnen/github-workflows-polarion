@@ -23,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
-          fetch-depth: 1
+          fetch-depth: 0  # Full history — avoids claude-code-action needing its own git fetch with cleared credentials
           persist-credentials: false  # Security: don't persist credentials
       - name: Minimize outdated Claude comments
         env:
