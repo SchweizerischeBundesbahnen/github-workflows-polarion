@@ -47,8 +47,9 @@ flowchart TD
   E --> F(Step 2: Get PR diff + fetch previous comments and threads)
   F --> G(Step 3: Process previous claude bot review threads)
   G --> H(Step 4: Triage bot reviewer comments)
-  H --> I(Step 5: Analyze diff and post inline comments)
-  I --> J(Step 6: Post PR summary comment)
+  H --> I(Step 5: Triage human reviewer comments)
+  I --> J(Step 6: Analyze diff and post inline comments)
+  J --> K(Step 7: Post PR summary comment)
 ```
 
 ### Pre-step: Minimize Outdated Comments (shell)
@@ -62,7 +63,7 @@ Claude reads `CLAUDE.md` and referenced files to understand code conventions, ar
 ### Step 2: Gather Review Context
 
 - **Full PR diff** — reviews the complete diff (not just the last commit)
-- **Previous review comments** — fetches prior comments and review threads (both `claude[bot]` and bot reviewers like Copilot, Greptile) via REST API and GraphQL to avoid duplicates and enable thread processing
+- **Previous review comments** — fetches prior comments and review threads (`claude[bot]`, bot reviewers like Copilot/Greptile, and human reviewers) via REST API and GraphQL to avoid duplicates and enable thread processing
 
 ### Step 3: Process Previous Review Threads
 
@@ -88,7 +89,25 @@ For each unresolved bot reviewer thread, Claude reads the **current file content
 
 Claude critically evaluates each finding — cosmetic nitpicks and style preferences are dismissed, only real bugs and meaningful improvements are acknowledged.
 
-### Step 5: Analyze and Post Inline Comments
+### Step 5: Triage Human Reviewer Comments
+
+Claude triages comments from human reviewers (non-bot, non-Claude authors). The PR author's own comments are excluded — only comments from other human reviewers are processed.
+
+For each unresolved human reviewer thread, Claude reads the **current file content** and classifies:
+
+| Classification | Action |
+|---------------|--------|
+| **Fixed** | Reply acknowledging the fix, resolve the thread |
+| **Valid** | Acknowledge the comment, leave thread open for the PR author to address |
+| **Already resolved** | Skip |
+
+Key differences from bot triage:
+
+- Human comments are **never dismissed** as false positives or cosmetic nitpicks — they are treated as high-signal feedback
+- Valid human comments are **not resolved** by Claude — only humans should resolve human feedback
+- Fixed comments are resolved with a respectful acknowledgment rather than a terse "Fixed" reply
+
+### Step 6: Analyze and Post Inline Comments
 
 Claude reviews each changed line using `mcp__github_inline_comment__create_inline_comment` (built-in MCP tool, no Docker required), focusing on:
 
@@ -127,7 +146,7 @@ Detailed explanation of the issue, proof, impact, and fix.
 | :yellow_circle: | Warning | Likely bug or risky pattern |
 | :large_blue_circle: | Convention | CLAUDE.md violation |
 
-### Step 6: Post PR Summary Comment
+### Step 7: Post PR Summary Comment
 
 A summary comment is posted on the PR. The heading varies based on findings:
 
@@ -135,12 +154,13 @@ A summary comment is posted on the PR. The heading varies based on findings:
 |----------|---------|
 | Claude found issues | `## Claude Code Review Summary` |
 | No issues, no open bot reviewer findings | `## ✅ No issues found` |
-| No Claude issues, but valid bot reviewer findings left open | `## ℹ️ No new issues found — Z bot reviewer finding(s) acknowledged` |
+| No Claude issues, but valid bot/human reviewer findings left open | `## ℹ️ No new issues found — N bot reviewer finding(s) and M human reviewer finding(s) acknowledged` |
 
 Each summary includes collapsible sections:
 
 - Confidence score (1-5) with brief assessment
 - Bot Review Triage (omitted if no bot reviewer threads were found)
+- Human Review Triage (omitted if no human reviewer threads were found)
 - Table of important files changed
 
 **Confidence scale:**
@@ -166,9 +186,10 @@ flowchart TD
   E -->|Fixed| F(Resolve thread + minimize as outdated)
   E -->|Still present| G(Leave thread open)
   D --> H(Triage bot reviewer comments)
+  H --> L(Triage human reviewer comments)
   F --> I(Analyze diff for new issues)
   G --> I
-  H --> I
+  L --> I
   I --> J(Post updated summary)
 ```
 

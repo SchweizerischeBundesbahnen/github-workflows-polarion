@@ -25,7 +25,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 
 ## Review Architecture
 
-- Claude Code Review (`reusable-claude-code-review.yml`) runs on `pull_request` events — reviews code and triages previous review threads
+- Claude Code Review (`reusable-claude-code-review.yml`) runs on `pull_request` events — reviews code and triages previous review threads (from Claude, bot reviewers, and human reviewers)
 
 ### Known Limitation: `pull_request_review` trigger and OAuth
 
