@@ -47,7 +47,6 @@ jobs:
         id: claude-review
         uses: anthropics/claude-code-action@1b422b3517b51140e4484faab676c5e68b914866  # v1.0.73
         with:
-          github_token: ${{ github.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           track_progress: true
           prompt: |
