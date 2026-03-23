@@ -65,10 +65,14 @@ jobs:
             each comment's `id`, `node_id`, `user.login`, path, line, body.
             Also fetch review threads via GraphQL (query
             repository.pullRequest.reviewThreads with id, isResolved, and first
-            comment's author login, body, path, line). Do NOT re-report
-            already-flagged issues.
+            comment's author login, __typename, body, path, line).
+            IMPORTANT: GraphQL returns Bot app logins WITHOUT the `[bot]`
+            suffix (e.g. `claude` not `claude[bot]`). Always use `__typename`
+            (Bot vs User) to distinguish bots from humans — never rely on
+            login string matching. Do NOT re-report already-flagged issues.
 
-            3. MANDATORY — Process ALL previous claude[bot] review threads.
+            3. MANDATORY — Process ALL previous Claude review threads
+            (author login `claude` with __typename `Bot`).
             Do NOT skip this step even if you find no new issues. For each
             unresolved thread, read the CURRENT file content (use Read tool,
             not the diff) and classify:
@@ -87,8 +91,8 @@ jobs:
             If in_progress, poll every 30s (max 5 min).
             Then find ALL unresolved bot review threads: filter GraphQL
             reviewThreads where isResolved == false and first comment author
-            login contains "[bot]" but is NOT "claude[bot]". This covers
-            copilot-pull-request-reviewer[bot], greptile[bot], and any future
+            __typename is `Bot` but login is NOT `claude`. This covers
+            copilot-pull-request-reviewer, greptile, and any future
             bot reviewer. Cross-reference with REST comments (from step 2) to
             get COMMENT_ID and node_id for mutations. For each, read the
             CURRENT file content and classify:
@@ -104,8 +108,8 @@ jobs:
 
             5. MANDATORY — Triage human reviewer comments.
             Find ALL unresolved review threads where isResolved == false and
-            first comment author login does NOT contain "[bot]" and is NOT
-            "claude[bot]" and is NOT "${{ github.event.pull_request.user.login }}"
+            first comment author __typename is `User` (NOT `Bot`) and login
+            is NOT "${{ github.event.pull_request.user.login }}"
             (the PR author). Cross-reference with REST comments (from step 2)
             to get COMMENT_ID for replies and thread id for resolve mutations.
             For each, read the CURRENT file content and classify:
