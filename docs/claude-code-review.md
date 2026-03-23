@@ -63,11 +63,11 @@ Claude reads `CLAUDE.md` and referenced files to understand code conventions, ar
 ### Step 2: Gather Review Context
 
 - **Full PR diff** — reviews the complete diff (not just the last commit)
-- **Previous review comments** — fetches prior comments and review threads (`claude[bot]`, bot reviewers like Copilot/Greptile, and human reviewers) via REST API and GraphQL to avoid duplicates and enable thread processing
+- **Previous review comments** — fetches prior comments and review threads (Claude, bot reviewers like Copilot/Greptile, and human reviewers) via REST API and GraphQL to avoid duplicates and enable thread processing. **Note:** GraphQL returns Bot app logins without the `[bot]` suffix (e.g. `claude` not `claude[bot]`), so `__typename` (`Bot` vs `User`) is used to distinguish bots from humans
 
 ### Step 3: Process Previous Review Threads
 
-For every unresolved review thread authored by `claude[bot]`, Claude reads the **current file content** (not just the diff) to determine if the issue still exists:
+For every unresolved review thread authored by Claude (`__typename: Bot`, login: `claude`), Claude reads the **current file content** (not just the diff) to determine if the issue still exists:
 
 | Classification | Action |
 |---------------|--------|
@@ -77,7 +77,7 @@ For every unresolved review thread authored by `claude[bot]`, Claude reads the *
 
 ### Step 4: Triage Bot Reviewer Comments (Copilot, Greptile, etc.)
 
-Claude triages comments from all bot reviewers. For Copilot specifically, it first checks if the check run exists and polls every 30 seconds (up to 5 minutes) if still running. Then it finds all unresolved review threads where the author login contains `[bot]` (excluding `claude[bot]`), covering Copilot, Greptile, and any future bot reviewer.
+Claude triages comments from all bot reviewers. For Copilot specifically, it first checks if the check run exists and polls every 30 seconds (up to 5 minutes) if still running. Then it finds all unresolved review threads where the author `__typename` is `Bot` (excluding Claude's own login), covering Copilot, Greptile, and any future bot reviewer.
 
 For each unresolved bot reviewer thread, Claude reads the **current file content** and classifies:
 
@@ -91,7 +91,7 @@ Claude critically evaluates each finding — cosmetic nitpicks and style prefere
 
 ### Step 5: Triage Human Reviewer Comments
 
-Claude triages comments from human reviewers (non-bot, non-Claude authors). The PR author's own comments are excluded — only comments from other human reviewers are processed.
+Claude triages comments from human reviewers (`__typename: User`, excluding the PR author). Only comments from other human reviewers are processed.
 
 For each unresolved human reviewer thread, Claude reads the **current file content** and classifies:
 
