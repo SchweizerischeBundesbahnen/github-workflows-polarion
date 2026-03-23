@@ -66,9 +66,12 @@ jobs:
             repository.pullRequest.reviewThreads with id, isResolved, and first
             comment's author login, __typename, body, path, line).
             IMPORTANT: GraphQL returns Bot app logins WITHOUT the `[bot]`
-            suffix (e.g. `claude` not `claude[bot]`). Always use `__typename`
-            (Bot vs User) to distinguish bots from humans — never rely on
-            login string matching. Do NOT re-report already-flagged issues.
+            suffix (e.g. `claude` not `claude[bot]`). For bot vs human
+            detection, always use `__typename` (Bot vs User) — do NOT rely on
+            login substring heuristics like checking for a `[bot]` suffix. Exact
+            login equality checks (e.g. `login == "claude"`) are allowed when
+            you need to identify a specific actor. Do NOT re-report
+            already-flagged issues.
 
             3. MANDATORY — Process ALL previous Claude review threads
             (author login `claude` with __typename `Bot`).
