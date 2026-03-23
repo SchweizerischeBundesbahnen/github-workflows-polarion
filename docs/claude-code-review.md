@@ -43,7 +43,8 @@ flowchart TD
   B -->|Yes| Z(Workflow skipped)
   B -->|No| C(Checkout repository)
   C --> D(Shell: Minimize outdated Claude comments)
-  D --> E(Step 1: Read CLAUDE.md and project conventions)
+  D --> D2(Shell: Classify review threads)
+  D2 --> E(Step 1: Read CLAUDE.md and project conventions)
   E --> F(Step 2: Get PR diff + fetch previous comments and threads)
   F --> G(Step 3: Process previous claude bot review threads)
   G --> H(Step 4: Triage bot reviewer comments)
@@ -52,9 +53,24 @@ flowchart TD
   J --> K(Step 7: Post PR summary comment)
 ```
 
-### Pre-step: Minimize Outdated Comments (shell)
+### Pre-step A: Minimize Outdated Comments (shell)
 
 A dedicated shell step (not part of the Claude prompt) runs **before** the review. It finds all previous PR comments authored by `claude[bot]` that match summary or tracking patterns and minimizes them as outdated. This is a shell script, not a Claude instruction, so it always runs regardless of what Claude decides to do.
+
+### Pre-step B: Classify Review Threads (shell)
+
+A second shell step fetches review threads (up to 100) via GraphQL (including `author { login __typename }`) and classifies each thread deterministically into categories:
+
+| Category | Criteria | Used in |
+|----------|----------|---------|
+| `claude` | `__typename == Bot` and `login == "claude"` | Step 3 |
+| `bot` | `__typename == Bot` and `login != "claude"` | Step 4, Bot Review Triage |
+| `human` | `__typename == User` and `login != PR author` | Step 5, Human Review Triage |
+| `pr_author` | `login == PR author` | Excluded from triage |
+
+The classified JSON is written to `/tmp/classified-threads.json` and read by Claude in step 2. This ensures thread classification is deterministic — Claude uses the pre-classified categories for both triage (steps 3-5) and summary (step 7), preventing misattribution.
+
+**Why shell, not prompt?** GraphQL returns Bot app logins without the `[bot]` suffix (e.g. `claude` not `claude[bot]`). Prompt-based classification was unreliable: Claude would re-classify threads independently in the summary step, ignoring the filtering logic from earlier steps and misattributing bot threads to human reviewers.
 
 ### Step 1: Learn Project Context
 
@@ -63,11 +79,12 @@ Claude reads `CLAUDE.md` and referenced files to understand code conventions, ar
 ### Step 2: Gather Review Context
 
 - **Full PR diff** — reviews the complete diff (not just the last commit)
-- **Previous review comments** — fetches prior comments and review threads (Claude, bot reviewers like Copilot/Greptile, and human reviewers) via REST API and GraphQL to avoid duplicates and enable thread processing. **Note:** GraphQL returns Bot app logins without the `[bot]` suffix (e.g. `claude` not `claude[bot]`), so `__typename` (`Bot` vs `User`) is used to distinguish bots from humans
+- **Pre-classified threads** — reads `/tmp/classified-threads.json` (from pre-step B) containing all review threads with deterministic category assignments
+- **REST comments** — fetches via REST API to get `node_id` for minimize mutations
 
 ### Step 3: Process Previous Review Threads
 
-For every unresolved review thread authored by Claude (`__typename: Bot`, login: `claude`), Claude reads the **current file content** (not just the diff) to determine if the issue still exists:
+For every unresolved thread in `claude_threads` (from pre-classified JSON), Claude reads the **current file content** (not just the diff) to determine if the issue still exists:
 
 | Classification | Action |
 |---------------|--------|
@@ -77,9 +94,9 @@ For every unresolved review thread authored by Claude (`__typename: Bot`, login:
 
 ### Step 4: Triage Bot Reviewer Comments (Copilot, Greptile, etc.)
 
-Claude triages comments from all bot reviewers. For Copilot specifically, it first checks if the check run exists and polls every 30 seconds (up to 5 minutes) if still running. Then it finds all unresolved review threads where the author `__typename` is `Bot` (excluding Claude's own login), covering Copilot, Greptile, and any future bot reviewer.
+Claude triages comments from all bot reviewers using `bot_threads` from the pre-classified JSON. For Copilot specifically, it first checks if the check run exists and polls every 30 seconds (up to 5 minutes) if still running.
 
-For each unresolved bot reviewer thread, Claude reads the **current file content** and classifies:
+For each unresolved thread in `bot_threads`, Claude reads the **current file content** and classifies:
 
 | Classification | Action |
 |---------------|--------|
@@ -91,9 +108,9 @@ Claude critically evaluates each finding — cosmetic nitpicks and style prefere
 
 ### Step 5: Triage Human Reviewer Comments
 
-Claude triages comments from human reviewers (`__typename: User`, excluding the PR author). Only comments from other human reviewers are processed.
+Claude triages comments from human reviewers using `human_threads` from the pre-classified JSON. Only comments from non-bot, non-PR-author reviewers are included.
 
-For each unresolved human reviewer thread, Claude reads the **current file content** and classifies:
+For each unresolved thread in `human_threads`, Claude reads the **current file content** and classifies:
 
 | Classification | Action |
 |---------------|--------|

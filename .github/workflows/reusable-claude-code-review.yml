@@ -43,6 +43,75 @@ jobs:
                 }
               }"
           done
+      - name: Classify review threads
+        id: classify-threads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          # Fetch all review threads with author type via GraphQL
+          threads_json=$(gh api graphql -f query="
+            query {
+              repository(owner: \"$REPO_OWNER\", name: \"$REPO_NAME\") {
+                pullRequest(number: $PR_NUMBER) {
+                  reviewThreads(first: 100) {
+                    nodes {
+                      id
+                      isResolved
+                      comments(first: 1) {
+                        nodes {
+                          databaseId
+                          body
+                          path
+                          line
+                          author { login __typename }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }")
+
+          # Classify each thread deterministically
+          echo "$threads_json" | jq --arg pr_author "$PR_AUTHOR" '
+            .data.repository.pullRequest.reviewThreads.nodes | map(
+              . as $thread |
+              ($thread.comments.nodes[0].author // {login: "unknown", __typename: "User"}) as $author |
+              {
+                thread_id: $thread.id,
+                is_resolved: $thread.isResolved,
+                comment_id: $thread.comments.nodes[0].databaseId,
+                path: $thread.comments.nodes[0].path,
+                line: $thread.comments.nodes[0].line,
+                body: ($thread.comments.nodes[0].body // "")[0:200],
+                author_login: $author.login,
+                author_type: $author.__typename,
+                category: (
+                  if $author.__typename == "Bot" and $author.login == "claude" then "claude"
+                  elif $author.__typename == "Bot" then "bot"
+                  elif $author.login == $pr_author then "pr_author"
+                  else "human"
+                  end
+                )
+              }
+            ) | {
+              claude_threads: [.[] | select(.category == "claude")],
+              bot_threads: [.[] | select(.category == "bot")],
+              human_threads: [.[] | select(.category == "human")],
+              pr_author_threads: [.[] | select(.category == "pr_author")]
+            }' > /tmp/classified-threads.json
+
+          echo "=== Thread classification ==="
+          jq '{
+            claude: (.claude_threads | length),
+            bot: (.bot_threads | length),
+            human: (.human_threads | length),
+            pr_author: (.pr_author_threads | length)
+          }' /tmp/classified-threads.json
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@df37d2f0760a4b5683a6e617c9325bc1a36443f6  # v1.0.75
@@ -59,44 +128,43 @@ jobs:
             1. Read CLAUDE.md and any files it references to learn project
             conventions and review standards.
 
-            2. Get the PR diff with `gh pr diff`. Fetch previous review comments
-            via REST API (`gh api --paginate .../pulls/NUMBER/comments`) to get
-            each comment's `id`, `node_id`, `user.login`, path, line, body.
-            Also fetch review threads via GraphQL (query
-            repository.pullRequest.reviewThreads with id, isResolved, and first
-            comment's author login, __typename, body, path, line).
-            IMPORTANT: GraphQL returns Bot app logins WITHOUT the `[bot]`
-            suffix (e.g. `claude` not `claude[bot]`). For bot vs human
-            detection, always use `__typename` (Bot vs User) — do NOT rely on
-            login substring heuristics like checking for a `[bot]` suffix. Exact
-            login equality checks (e.g. `login == "claude"`) are allowed when
-            you need to identify a specific actor. Do NOT re-report
-            already-flagged issues.
+            2. Get the PR diff with `gh pr diff`. Read `/tmp/classified-threads.json`
+            which contains ALL review threads pre-classified by a shell step.
+            The JSON has this structure:
+            ```json
+            {
+              "claude_threads": [...],   // threads authored by claude (Bot)
+              "bot_threads": [...],      // threads by other bots (Copilot, Greptile, etc.)
+              "human_threads": [...],    // threads by human reviewers (not PR author)
+              "pr_author_threads": [...]  // threads by the PR author (excluded from triage)
+            }
+            ```
+            Each thread has: `thread_id`, `is_resolved`, `comment_id`, `path`,
+            `line`, `body` (first 200 chars), `author_login`, `author_type`, `category`.
+            Use ONLY this classification — do NOT re-classify threads yourself.
+            Also fetch REST comments (`gh api --paginate .../pulls/NUMBER/comments`)
+            to get `node_id` for minimize mutations. Do NOT re-report already-flagged issues.
 
-            3. MANDATORY — Process ALL previous Claude review threads
-            (author login `claude` with __typename `Bot`).
+            3. MANDATORY — Process ALL previous Claude review threads.
+            Use `claude_threads` from the classified JSON.
             Do NOT skip this step even if you find no new issues. For each
-            unresolved thread, read the CURRENT file content (use Read tool,
-            not the diff) and classify:
+            UNRESOLVED thread (`is_resolved == false`), read the CURRENT file
+            content (use Read tool, not the diff) and classify:
             - FIXED: resolve and minimize:
               `gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'`
               `gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "COMMENT_NODE_ID", classifier: OUTDATED}) { minimizedComment { isMinimized } } }'`
             - STILL PRESENT: leave open, count in summary
             - ALREADY RESOLVED: skip
-            Note: use thread `id` for resolveReviewThread, comment `node_id`
-            for minimizeComment. You cannot score 5/5 confidence if unresolved
-            issues remain.
+            Note: use thread `thread_id` for resolveReviewThread, comment `node_id`
+            (from REST) for minimizeComment. You cannot score 5/5 confidence
+            if unresolved issues remain.
 
             4. MANDATORY — Triage bot reviewer comments (Copilot, Greptile, etc.).
             First, if Copilot is enabled, wait for it:
             `gh api repos/${{ github.repository }}/commits/${{ github.event.pull_request.head.sha }}/check-runs --jq '.check_runs[] | select(.name == "Copilot code review") | {status, conclusion}'`
             If in_progress, poll every 30s (max 5 min).
-            Then find ALL unresolved bot review threads: filter GraphQL
-            reviewThreads where isResolved == false and first comment author
-            __typename is `Bot` but login is NOT `claude`. This covers
-            copilot-pull-request-reviewer, greptile, and any future
-            bot reviewer. Cross-reference with REST comments (from step 2) to
-            get COMMENT_ID and node_id for mutations. For each, read the
+            Use `bot_threads` from the classified JSON.
+            For each UNRESOLVED thread (`is_resolved == false`), read the
             CURRENT file content and classify:
             - FIXED: reply, resolve, and minimize:
               `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/COMMENT_ID/replies --method POST -f body="Fixed — this issue has been addressed in the current code."`
@@ -109,12 +177,9 @@ jobs:
             Dismiss cosmetic nitpicks — only acknowledge real bugs/security issues.
 
             5. MANDATORY — Triage human reviewer comments.
-            Find ALL unresolved review threads where isResolved == false and
-            first comment author __typename is `User` (NOT `Bot`) and login
-            is NOT "${{ github.event.pull_request.user.login }}"
-            (the PR author). Cross-reference with REST comments (from step 2)
-            to get COMMENT_ID for replies and thread id for resolve mutations.
-            For each, read the CURRENT file content and classify:
+            Use `human_threads` from the classified JSON.
+            For each UNRESOLVED thread (`is_resolved == false`), read the
+            CURRENT file content and classify:
             - FIXED: reply acknowledging the fix, then resolve:
               `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/COMMENT_ID/replies --method POST -f body="Thanks — this has been addressed in the current code."`
               `gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'`
@@ -141,14 +206,21 @@ jobs:
               with brief assessment (5/5 = simple changes fully understood,
               3/5 = complex changes needing human judgment)
             - `<details><summary><h3>Bot Review Triage</h3></summary>`
-              with triage counts and per-comment actions grouped by reviewer bot
-              (OMIT if no bot reviewer threads)
+              with triage of `bot_threads` ONLY, grouped by `author_login`
+              (OMIT if `bot_threads` is empty)
             - `<details><summary><h3>Human Review Triage</h3></summary>`
-              with triage counts and per-comment actions grouped by reviewer.
+              with triage of `human_threads` ONLY, grouped by `author_login`.
               Show each comment's classification (FIXED/VALID) and action taken.
-              (OMIT if no human reviewer threads)
+              (OMIT if `human_threads` is empty)
             - `<details><summary><h3>Important Files Changed</h3></summary>`
               with markdown table (filename | overview)
+            CRITICAL: Use ONLY the pre-classified categories from
+            `/tmp/classified-threads.json` for the summary sections. Do NOT
+            re-classify threads or attribute threads to different authors.
+            `claude_threads` go in step 3 processing only (not in summary sections).
+            `bot_threads` go in Bot Review Triage only.
+            `human_threads` go in Human Review Triage only.
+            `pr_author_threads` are excluded from all triage sections.
 
             RULES:
             - Confidence >= 80 to report an issue. False positives waste reviewer time.
