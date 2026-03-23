@@ -43,7 +43,8 @@ flowchart TD
   B -->|Yes| Z(Workflow skipped)
   B -->|No| C(Checkout repository)
   C --> D(Shell: Minimize outdated Claude comments)
-  D --> E(Step 1: Read CLAUDE.md and project conventions)
+  D --> D2(Shell: Classify review threads)
+  D2 --> E(Step 1: Read CLAUDE.md and project conventions)
   E --> F(Step 2: Get PR diff + fetch previous comments and threads)
   F --> G(Step 3: Process previous claude bot review threads)
   G --> H(Step 4: Triage bot reviewer comments)
@@ -58,7 +59,7 @@ A dedicated shell step (not part of the Claude prompt) runs **before** the revie
 
 ### Pre-step B: Classify Review Threads (shell)
 
-A second shell step fetches all review threads via GraphQL (including `author { login __typename }`) and classifies each thread deterministically into categories:
+A second shell step fetches review threads (up to 100) via GraphQL (including `author { login __typename }`) and classifies each thread deterministically into categories:
 
 | Category | Criteria | Used in |
 |----------|----------|---------|
