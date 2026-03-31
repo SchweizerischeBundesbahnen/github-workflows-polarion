@@ -14,6 +14,7 @@ jobs:
       github.event.pull_request.head.repo.fork == false
     runs-on: ubuntu-latest
     permissions:
+      actions: read  # Required for claude-code-action github_ci MCP server
       contents: read  # Security: read-only sufficient for reviews
       pull-requests: write
       issues: write  # Required for gh pr comment (PRs are issues)
