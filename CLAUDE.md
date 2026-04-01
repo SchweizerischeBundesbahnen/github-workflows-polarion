@@ -13,7 +13,9 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 
 - All GitHub Actions must be pinned to full commit SHAs with a version comment (e.g. `uses: actions/checkout@<sha> # v6.0.2`)
 - Workflows must set `permissions: {}` at the top level and grant only required permissions at the job level
-- Checkout steps must include `persist-credentials: false` — exception: `reusable-claude-code-review.yml` requires `true` because `claude-code-action` needs git credentials for its internal PR branch fetch
+- Checkout steps must include `persist-credentials: false` — exceptions:
+  - `reusable-claude-code-review.yml` — `claude-code-action` needs git credentials for PR branch fetch
+  - `reusable-actionlint.yml` — reviewdog falls back to `git fetch` for diff fetching on private repos
 - Reusable workflows accept secrets via `workflow_call` — never hardcode secrets or tokens
 - Use `${{ github.repository_owner }}` instead of hardcoding the org name to keep workflows portable
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
