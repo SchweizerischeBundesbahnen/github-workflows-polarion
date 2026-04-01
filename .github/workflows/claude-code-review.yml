@@ -15,6 +15,7 @@ jobs:
   claude-review:
     uses: ./.github/workflows/reusable-claude-code-review.yml
     permissions:
+      actions: read
       contents: read
       pull-requests: write
       issues: write
