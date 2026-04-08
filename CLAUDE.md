@@ -15,6 +15,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 - Workflows must set `permissions: {}` at the top level and grant only required permissions at the job level
 - Checkout steps must include `persist-credentials: false` — exceptions:
   - `reusable-claude-code-review.yml` — `claude-code-action` needs git credentials for PR branch fetch
+  - `reusable-claude.yml` — `claude-code-action` needs git credentials to operate on the PR branch
   - `reusable-actionlint.yml` — reviewdog falls back to `git fetch` for diff fetching on private repos
 - Reusable workflows accept secrets via `workflow_call` — never hardcode secrets or tokens
 - Use `${{ github.repository_owner }}` instead of hardcoding the org name to keep workflows portable
@@ -28,6 +29,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 ## Review Architecture
 
 - Claude Code Review (`reusable-claude-code-review.yml`) runs on `pull_request` events — reviews code and triages previous review threads (from Claude, bot reviewers, and human reviewers)
+- Claude Code (`reusable-claude.yml`) runs on `issue_comment`, `pull_request_review_comment`, `pull_request_review`, and `issues` events — invokes `claude-code-action` when a human mentions `@claude` (all bot actors excluded via `sender.type != 'Bot'`)
 
 ### Known Limitation: `pull_request_review` trigger and OAuth
 
