@@ -24,7 +24,7 @@ The caller subscribes to four events and the reusable job filters them:
 
 A run is only dispatched when **all** of the following hold:
 
-- The actor is not `renovate[bot]`
+- The triggering actor is not a bot (`sender.type != 'Bot'`)
 - The event payload contains the string `@claude` in the relevant field (comment body, review body, issue body, or issue title)
 
 ## Permissions
