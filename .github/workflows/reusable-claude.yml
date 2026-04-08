@@ -1,0 +1,39 @@
+---
+name: Claude Code (reusable)
+on:
+  workflow_call:
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: true
+permissions: {}
+jobs:
+  claude:
+    # Run Claude only when a human (not renovate) mentions @claude in an
+    # issue, PR comment, review, or review comment. The caller workflow
+    # subscribes to all four events; this job filters them.
+    if: |
+      github.actor != 'renovate[bot]' && (
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+        (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write  # Required for claude-code-action OIDC auth
+      actions: read  # Required for Claude to read CI results on PRs
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: true  # Required: claude-code-action needs git credentials
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@1eddb334cfa79fdb21ecbe2180ca1a016e8e7d47  # v1.0.88
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

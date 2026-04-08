@@ -18,6 +18,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 | Workflow | Description |
 |----------|-------------|
 | `reusable-actionlint.yml` | GitHub Actions workflow validation using actionlint |
+| `reusable-claude.yml` | On-demand Claude Code assistant triggered by `@claude` mentions in issues, PRs, and reviews |
 | `reusable-claude-code-review.yml` | AI-powered code review using Claude Code |
 | `reusable-add-issue-to-project.yml` | Automatically add new issues to a GitHub project board |
 | `reusable-pr.yml` | PR checks with conventional commit validation |
@@ -32,6 +33,31 @@ Call a reusable workflow from your repository:
 jobs:
   claude-review:
     uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-claude-code-review.yml@main
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+```
+
+```yaml
+# @claude mention handler — triggered from issues, PR comments, and reviews
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+permissions: {}
+jobs:
+  claude:
+    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-claude.yml@main
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+      actions: read
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```

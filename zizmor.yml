@@ -3,8 +3,15 @@ rules:
   # Secrets are protected by GitHub's fork PR approval requirement,
   # which prevents untrusted workflows from accessing secrets without explicit approval.
   secrets-outside-env:
-    ignore: [claude-code-review.yml, reusable-claude-code-review.yml]
+    ignore:
+      - claude-code-review.yml
+      - reusable-claude-code-review.yml
+      - claude.yml
+      - reusable-claude.yml
   # claude-code-action and reviewdog need git credentials for PR branch/diff fetch.
   # Risk is minimal: runner is ephemeral and token expires with the workflow.
   artipacked:
-    ignore: [reusable-claude-code-review.yml, reusable-actionlint.yml]
+    ignore:
+      - reusable-claude-code-review.yml
+      - reusable-actionlint.yml
+      - reusable-claude.yml
