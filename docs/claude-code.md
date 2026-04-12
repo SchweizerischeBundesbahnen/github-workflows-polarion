@@ -73,6 +73,10 @@ jobs:
 - **Reusable workflow**: `reusable-claude.yml`
 - **Secret required**: `CLAUDE_CODE_OAUTH_TOKEN`
 - **Timeout**: 30 minutes per run
+- **Max turns**: 30 (cost/runaway guard; matches `reusable-claude-code-review.yml`)
+- **Model**: `opus` (short alias — auto-upgrades to latest Opus generation)
+- **Progress tracking**: `track_progress: true` — posts a sticky "Claude is working..." comment with live checklist
+- **CI access**: `additional_permissions: actions: read` — enables `mcp__github_ci__*` MCP tools so Claude can read CI logs when asked "@claude why did this fail?"
 - **Checkout depth**: `fetch-depth: 1` (shallow; the action fetches more if it needs to)
 
 ## Relationship to `reusable-claude-code-review.yml`
