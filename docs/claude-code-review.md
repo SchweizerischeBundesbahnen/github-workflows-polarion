@@ -171,16 +171,14 @@ For each issue found in step 6, Claude posts an inline comment using `mcp__githu
 
 ### Step 8: Submit PR Review
 
-A formal GitHub PR review is submitted via `gh pr review`. This shows in the PR's "Reviews" sidebar (not buried in the comment timeline) and signals a clear verdict.
+A formal GitHub PR review is submitted via `gh pr review`. This shows in the PR's "Reviews" sidebar (not buried in the comment timeline).
 
-**Review verdict:**
+Claude **always** uses `--event COMMENT`. It never uses `REQUEST_CHANGES` or `APPROVE`:
 
-| Scenario | Event |
-|----------|-------|
-| No issues found | `COMMENT` |
-| Issues found (confidence >= 80) | `REQUEST_CHANGES` |
+- **`REQUEST_CHANGES`** from a bot creates a merge blocker that only the bot can dismiss — the PR author cannot clear it.
+- **`APPROVE`** from a bot can silently satisfy branch protection approval requirements, bypassing human review gates.
 
-Claude **never** uses `APPROVE` — auto-approving from a bot can silently satisfy branch protection rules, bypassing human review gates.
+Severity is communicated through inline comments and the confidence score, not the review event type.
 
 The review body heading varies based on findings:
 

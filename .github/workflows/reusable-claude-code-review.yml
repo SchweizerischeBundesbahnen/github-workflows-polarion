@@ -290,11 +290,14 @@ jobs:
             Do NOT fall back to reporting it in the summary (step 8).
 
             8. Submit a formal PR review via `gh pr review` with this structure.
-            Choose the review event based on findings:
-            - No issues found → `--event COMMENT`
-            - Issues found (confidence >= 80) → `--event REQUEST_CHANGES`
-            - NEVER use `--event APPROVE` (auto-approve from a bot can bypass
-              human review gates in branch protection rules)
+            ALWAYS use `--event COMMENT`. NEVER use `REQUEST_CHANGES` or
+            `APPROVE`:
+            - `REQUEST_CHANGES` from a bot creates a merge blocker that
+              only the bot can dismiss — the PR author cannot clear it.
+            - `APPROVE` from a bot can silently satisfy branch protection
+              approval requirements, bypassing human review gates.
+            Severity is communicated through inline comments and the
+            confidence score, not the review event type.
             The review body should contain:
             - `## Claude Code Review Summary` (or `## ✅ No issues found` /
               `## ℹ️ No new issues found — N bot reviewer finding(s) and M human reviewer finding(s) acknowledged`)
