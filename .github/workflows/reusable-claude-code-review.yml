@@ -121,7 +121,7 @@ jobs:
           }' /tmp/classified-threads.json
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@1eddb334cfa79fdb21ecbe2180ca1a016e8e7d47  # v1.0.88
+        uses: anthropics/claude-code-action@2ff1acb3ee319fa302837dad6e17c2f36c0d98ea  # v1.0.91
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           track_progress: true
