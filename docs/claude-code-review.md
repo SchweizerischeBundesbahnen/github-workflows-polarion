@@ -43,14 +43,15 @@ flowchart TD
   B -->|Yes| Z(Workflow skipped)
   B -->|No| C(Checkout repository)
   C --> D(Shell: Minimize outdated Claude comments)
-  D --> D2(Shell: Classify review threads)
+  D --> D2(Shell: Classify review threads and PR-level reviews)
   D2 --> E(Step 1: Read CLAUDE.md and project conventions)
-  E --> F(Step 2: Get PR diff + fetch previous comments and threads)
+  E --> F(Step 2: Get PR diff + read classified threads and reviews)
   F --> G(Step 3: Process previous claude bot review threads)
   G --> H(Step 4: Triage bot reviewer comments)
-  H --> I(Step 5: Triage human reviewer comments)
-  I --> J(Step 6: Analyze diff and post inline comments)
-  J --> K(Step 7: Post PR summary comment)
+  H --> I(Step 5: Triage human reviewer comments and PR-level reviews)
+  I --> J(Step 6: Analyze PR diff for new issues)
+  J --> J2(Step 7: Post inline comments)
+  J2 --> K(Step 8: Submit PR review with verdict)
 ```
 
 ### Pre-step A: Minimize Outdated Comments (shell)
@@ -124,9 +125,10 @@ Key differences from bot triage:
 - Valid human comments are **not resolved** by Claude — only humans should resolve human feedback
 - Fixed comments are resolved with a respectful acknowledgment rather than a terse "Fixed" reply
 
-### Step 6: Analyze and Post Inline Comments
+### Step 6: Analyze the PR Diff
 
-Claude reviews each changed line using `mcp__github_inline_comment__create_inline_comment` (built-in MCP tool, no Docker required), focusing on:
+This is the core review step. Claude reads each changed file and analyzes the new code for issues:
+
 
 | Category | Examples |
 |----------|----------|
@@ -163,7 +165,11 @@ Detailed explanation of the issue, proof, impact, and fix.
 | :yellow_circle: | Warning | Likely bug or risky pattern |
 | :large_blue_circle: | Convention | CLAUDE.md violation |
 
-### Step 7: Submit PR Review
+### Step 7: Post Inline Comments
+
+For each issue found in step 6, Claude posts an inline comment using `mcp__github_inline_comment__create_inline_comment` (built-in MCP tool, no Docker required). Comments are anchored to the specific diff lines where the issue occurs.
+
+### Step 8: Submit PR Review
 
 A formal GitHub PR review is submitted via `gh pr review`. This shows in the PR's "Reviews" sidebar (not buried in the comment timeline) and signals a clear verdict.
 
@@ -218,7 +224,8 @@ flowchart TD
   F --> I(Analyze diff for new issues)
   G --> I
   L --> I
-  I --> J(Post updated summary)
+  I --> I2(Post inline comments)
+  I2 --> J(Submit PR review with verdict)
 ```
 
 ## Permissions
