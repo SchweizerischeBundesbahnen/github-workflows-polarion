@@ -40,7 +40,7 @@ jobs:
           persist-credentials: true  # Required: claude-code-action needs git credentials
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@76c083468952ef555951bbe4d9e21a3929ae2637  # v1.0.93
+        uses: anthropics/claude-code-action@1eddb334cfa79fdb21ecbe2180ca1a016e8e7d47  # v1.0.88
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           track_progress: true
