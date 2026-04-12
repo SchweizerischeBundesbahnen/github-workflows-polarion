@@ -163,9 +163,21 @@ Detailed explanation of the issue, proof, impact, and fix.
 | :yellow_circle: | Warning | Likely bug or risky pattern |
 | :large_blue_circle: | Convention | CLAUDE.md violation |
 
-### Step 7: Post PR Summary Comment
+### Step 7: Submit PR Review
 
-A summary comment is posted on the PR. The heading varies based on findings:
+A formal GitHub PR review is submitted via `gh pr review`. This shows in the PR's "Reviews" sidebar (not buried in the comment timeline) and signals a clear verdict.
+
+**Review verdict:**
+
+| Scenario | Event |
+|----------|-------|
+| No issues found | `COMMENT` |
+| Issues found, confidence >= 80 | `REQUEST_CHANGES` |
+| Issues found, confidence < 80 | `COMMENT` |
+
+Claude **never** uses `APPROVE` — auto-approving from a bot can silently satisfy branch protection rules, bypassing human review gates.
+
+The review body heading varies based on findings:
 
 | Scenario | Heading |
 |----------|---------|
@@ -218,14 +230,14 @@ The caller workflow must grant these permissions:
 |------------|-------|---------|
 | `contents` | read | Read repository files |
 | `pull-requests` | write | Post review comments |
-| `issues` | write | Required for `gh pr comment` |
+| `issues` | write | Required for `gh pr review` |
 | `id-token` | write | OIDC authentication |
 
 Claude's tool access is restricted to:
 
 - `Read`, `Grep`, `Glob`, `BatchTool` — codebase exploration (read-only)
 - `mcp__github_inline_comment__create_inline_comment` — post inline review comments (built-in MCP tool)
-- `Bash(gh pr comment:*)` — post PR summary comments
+- `Bash(gh pr review:*)` — submit formal PR review with verdict
 - `Bash(gh pr diff:*)` — read PR diff
 - `Bash(gh pr view:*)` — read PR metadata
 - `Bash(gh api:*)` — manage review threads and comments
@@ -253,6 +265,9 @@ jobs:
       id-token: write
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    # Optional: direct Claude's attention to specific areas
+    # with:
+    #   extra_focus: "check backward compatibility of the API changes"
 ```
 
 ## Configuration
@@ -263,3 +278,4 @@ jobs:
 - **Timeout**: 30 minutes per review
 - **Max turns**: 30
 - **Progress tracking**: `track_progress: true` — shows visual "In progress" → "Completed" status
+- **Extra focus**: Optional `extra_focus` input to direct the review toward specific concerns
