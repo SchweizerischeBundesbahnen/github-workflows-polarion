@@ -285,13 +285,21 @@ jobs:
             severity emoji + one-sentence summary + fix suggestion, then a
             collapsible `<details>` block with extended reasoning.
             Emojis: 🔴 bug, 🟠 security, 🟡 risky pattern, 🔵 CLAUDE.md violation.
+            If `mcp__github_inline_comment__create_inline_comment` fails
+            (line not in diff, validation error), include the finding in
+            the step 8 review body under a `### Concept-level observations`
+            section instead. Do NOT claim a specific file:line for these
+            — describe the concern at the design/architecture level only.
 
             8. Submit a formal PR review via `gh pr review` with this structure.
-            Choose the review event based on findings:
-            - No issues found → `--event COMMENT`
-            - Issues found (confidence >= 80) → `--event REQUEST_CHANGES`
-            - NEVER use `--event APPROVE` (auto-approve from a bot can bypass
-              human review gates in branch protection rules)
+            ALWAYS use `--event COMMENT`. NEVER use `REQUEST_CHANGES` or
+            `APPROVE`:
+            - `REQUEST_CHANGES` from a bot creates a merge blocker that
+              only the bot can dismiss — the PR author cannot clear it.
+            - `APPROVE` from a bot can silently satisfy branch protection
+              approval requirements, bypassing human review gates.
+            Severity is communicated through inline comments and the
+            confidence score, not the review event type.
             The review body should contain:
             - `## Claude Code Review Summary` (or `## ✅ No issues found` /
               `## ℹ️ No new issues found — N bot reviewer finding(s) and M human reviewer finding(s) acknowledged`)
@@ -317,8 +325,19 @@ jobs:
             `bot_threads` go in Bot Review Triage only.
             `human_threads` + `human_reviews` go in Human Review Triage only.
             `pr_author_threads` are excluded from all triage sections.
+            The review body MUST contain ONLY these sections: the `##`
+            heading, Confidence Score, Bot Review Triage, Human Review
+            Triage, Concept-level observations (from step 7 fallbacks
+            only — OMIT if none), Important Files Changed. Do NOT add
+            ad-hoc sections. File/line-level findings belong in inline
+            comments (step 7) ONLY — never narrate line-specific
+            findings in the review body.
 
             RULES:
+            - Before reporting that a string is stale or wrong, you MUST
+              `Read` the file and verify the exact claimed text appears on
+              the claimed line. Quote from the Read output verbatim, never
+              from memory. If the text is not in the Read output, drop it.
             - Every API call is permanent. Do NOT post test or placeholder comments.
             - Only post GitHub review submissions — don't submit review text as messages.
             - Do NOT run build tools or provide praise.
