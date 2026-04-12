@@ -172,8 +172,7 @@ A formal GitHub PR review is submitted via `gh pr review`. This shows in the PR'
 | Scenario | Event |
 |----------|-------|
 | No issues found | `COMMENT` |
-| Issues found, confidence >= 80 | `REQUEST_CHANGES` |
-| Issues found, confidence < 80 | `COMMENT` |
+| Issues found (confidence >= 80) | `REQUEST_CHANGES` |
 
 Claude **never** uses `APPROVE` — auto-approving from a bot can silently satisfy branch protection rules, bypassing human review gates.
 
@@ -230,7 +229,7 @@ The caller workflow must grant these permissions:
 |------------|-------|---------|
 | `contents` | read | Read repository files |
 | `pull-requests` | write | Post review comments |
-| `issues` | write | Required for `gh pr review` |
+| `issues` | write | Manage PR comments/threads and minimize outdated comments via API |
 | `id-token` | write | OIDC authentication |
 
 Claude's tool access is restricted to:

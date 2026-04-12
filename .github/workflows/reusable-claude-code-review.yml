@@ -210,8 +210,7 @@ jobs:
             7. Submit a formal PR review via `gh pr review` with this structure.
             Choose the review event based on findings:
             - No issues found → `--event COMMENT`
-            - Issues found with confidence >= 80 → `--event REQUEST_CHANGES`
-            - Issues found with confidence < 80 → `--event COMMENT`
+            - Issues found (confidence >= 80) → `--event REQUEST_CHANGES`
             - NEVER use `--event APPROVE` (auto-approve from a bot can bypass
               human review gates in branch protection rules)
             The review body should contain:
