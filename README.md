@@ -24,6 +24,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 | `reusable-pr.yml` | PR checks with conventional commit validation |
 | `reusable-openapi-validation.yml` | OpenAPI spec validation using Redocly CLI |
 | `reusable-release-please.yml` | Automated releases and changelogs using release-please (Maven, Python, Docker, etc.) |
+| `reusable-release-please-guard.yml` | Blocks PR merges when the base branch `pom.xml` version is not a SNAPSHOT (prevents post-release drift) |
 
 ## Usage
 
@@ -109,6 +110,21 @@ jobs:
     with:
       release-type: simple
       include-v-in-tag: false
+```
+
+```yaml
+# Maven release-please guard — blocks merges when base branch pom.xml is not a SNAPSHOT
+# Requires branch protection: add "release-please-guard" as required status check
+# and enable "Require branches to be up to date before merging"
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions: {}
+jobs:
+  release-please-guard:
+    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-release-please-guard.yml@main
+    permissions:
+      contents: read
 ```
 
 Each reusable workflow has a corresponding caller workflow (e.g. `claude-code-review.yml`) that demonstrates how this repository itself uses it.
