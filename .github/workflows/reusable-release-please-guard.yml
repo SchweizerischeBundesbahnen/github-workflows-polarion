@@ -30,9 +30,12 @@ jobs:
             echo "Release-please PR from trusted automation — skipping guard."
             exit 0
           fi
-          POM_CONTENT=$(gh api "repos/$GH_REPO/contents/pom.xml?ref=$BASE_BRANCH" \
-            --jq '.content' 2>/dev/null) || true
-          if [[ -z "$POM_CONTENT" ]]; then
+          if ! POM_CONTENT=$(gh api "repos/$GH_REPO/contents/pom.xml?ref=$BASE_BRANCH" \
+            --jq '.content' 2>/dev/null); then
+            echo "No pom.xml on '$BASE_BRANCH' — skipping guard."
+            exit 0
+          fi
+          if [[ -z "$POM_CONTENT" || "$POM_CONTENT" == "null" ]]; then
             echo "No pom.xml on '$BASE_BRANCH' — skipping guard."
             exit 0
           fi
