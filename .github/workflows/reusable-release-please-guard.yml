@@ -19,10 +19,15 @@ jobs:
           GH_REPO: ${{ github.repository }}
           BASE_BRANCH: ${{ github.base_ref }}
           HEAD_BRANCH: ${{ github.head_ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |-
           set -euo pipefail
-          if [[ "$HEAD_BRANCH" == release-please--* ]]; then
-            echo "Release-please PR — skipping guard."
+          if [[ -z "$BASE_BRANCH" ]]; then
+            echo "::error::BASE_BRANCH is empty. This workflow must be called from a pull_request context."
+            exit 1
+          fi
+          if [[ "$HEAD_BRANCH" == release-please--* ]] && [[ "$PR_AUTHOR" == "github-actions[bot]" || "$PR_AUTHOR" == "release-please[bot]" ]]; then
+            echo "Release-please PR from trusted automation — skipping guard."
             exit 0
           fi
           POM_CONTENT=$(gh api "repos/$GH_REPO/contents/pom.xml?ref=$BASE_BRANCH" \
