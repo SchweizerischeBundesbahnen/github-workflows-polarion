@@ -25,8 +25,13 @@ jobs:
             echo "Release-please PR — skipping guard."
             exit 0
           fi
-          VERSION=$(gh api "repos/$GH_REPO/contents/pom.xml?ref=$BASE_BRANCH" \
-            --jq '.content' | base64 -d | \
+          POM_CONTENT=$(gh api "repos/$GH_REPO/contents/pom.xml?ref=$BASE_BRANCH" \
+            --jq '.content' 2>/dev/null) || true
+          if [[ -z "$POM_CONTENT" ]]; then
+            echo "No pom.xml on '$BASE_BRANCH' — skipping guard."
+            exit 0
+          fi
+          VERSION=$(echo "$POM_CONTENT" | base64 -d | \
             awk '/<parent>/{p=1} /<\/parent>/{p=0;next} !p && /<version>/{gsub(/.*<version>|<\/version>.*/,""); print; exit}')
           if [[ -z "$VERSION" ]]; then
             echo "::error::Failed to extract project version from pom.xml on '$BASE_BRANCH'."
