@@ -23,7 +23,7 @@ jobs:
           client-id: ${{ secrets.POLARION_GITHUB_APP_ID }}
           private-key: ${{ secrets.POLARION_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-      - uses: actions/add-to-project@244f685bbc3b7adfa8466e08b698b5577571133e  # v1.0.2
+      - uses: actions/add-to-project@5afcf98fcd03f1c2f92c3c83f58ae24323cc57fd  # v2
         with:
           project-url: https://github.com/orgs/${{ github.repository_owner }}/projects/${{ inputs.project-number }}
           github-token: ${{ steps.app-token.outputs.token }}
