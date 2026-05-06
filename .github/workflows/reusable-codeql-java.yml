@@ -1,0 +1,84 @@
+---
+name: CodeQL Java (reusable)
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: Java version
+        required: false
+        type: string
+        default: "21"
+      java-distribution:
+        description: Java distribution (e.g. temurin)
+        required: false
+        type: string
+        default: temurin
+      query-suite:
+        description: CodeQL query suite (security-extended | security-and-quality)
+        required: false
+        type: string
+        default: security-extended
+      settings-xml-path:
+        description: Path to Maven settings.xml relative to repo root
+        required: false
+        type: string
+        default: .mvn/settings.xml
+      build-command:
+        description: |
+          Shell command(s) used to build the Java code so CodeQL can extract it.
+          Defaults to a compile-only Maven build; tests/javadoc/source jars are skipped.
+        required: false
+        type: string
+        default: |
+          mvn --batch-mode -s "${SETTINGS_XML}" clean install \
+            -DskipTests -Dmaven.javadoc.skip=true -Dmaven.source.skip=true
+      timeout-minutes:
+        description: Job timeout in minutes
+        required: false
+        type: number
+        default: 20
+    secrets:
+      IO_JFROG_SBB_POLARION_TOKEN:
+        required: true
+permissions: {}
+jobs:
+  analyze:
+    name: Analyze (java-kotlin)
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+      packages: read
+    env:
+      # Same secret-binding pattern as the inline codeql.yml on api-extender.
+      # PR-triggered runs from forks do not receive secrets (GitHub default),
+      # so the trust boundary matches the existing Maven build job.
+      IO_JFROG_SBB_POLARION_TOKEN: ${{ secrets.IO_JFROG_SBB_POLARION_TOKEN }}  # zizmor: ignore[secrets-outside-env]
+      SETTINGS_XML: ${{ github.workspace }}/${{ inputs.settings-xml-path }}
+      BUILD_COMMAND: ${{ inputs.build-command }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Set up JDK
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654  # v5.2.0
+        with:
+          distribution: ${{ inputs.java-distribution }}
+          java-version: ${{ inputs.java-version }}
+          cache: maven
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@e46ed2cbd01164d986452f91f178727624ae40d7  # v4
+        with:
+          languages: java-kotlin
+          build-mode: manual
+          queries: ${{ inputs.query-suite }}
+      - name: Build (compile only — no tests, no Sonar)
+        shell: bash
+        run: bash -c "$BUILD_COMMAND"
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@e46ed2cbd01164d986452f91f178727624ae40d7  # v4
+        with:
+          category: /language:java-kotlin
