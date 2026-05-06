@@ -39,8 +39,12 @@ jobs:
             echo "No pom.xml on '$BASE_BRANCH' — skipping guard."
             exit 0
           fi
-          VERSION=$(echo "$POM_CONTENT" | base64 -d | \
-            awk '/<parent>/{p=1} /<\/parent>/{p=0;next} !p && /<version>/{gsub(/.*<version>|<\/version>.*/,""); print; exit}')
+          # Decode once into a variable, then awk via here-string.
+          # Avoids SIGPIPE from `base64 -d` after `awk` exits on the first
+          # match (with `pipefail`, the broken pipe propagates and fails the
+          # whole step). See issue #78.
+          POM_DECODED=$(echo "$POM_CONTENT" | base64 -d)
+          VERSION=$(awk '/<parent>/{p=1} /<\/parent>/{p=0;next} !p && /<version>/{gsub(/.*<version>|<\/version>.*/,""); print; exit}' <<<"$POM_DECODED")
           if [[ -z "$VERSION" ]]; then
             echo "::error::Failed to extract project version from pom.xml on '$BASE_BRANCH'."
             exit 1
