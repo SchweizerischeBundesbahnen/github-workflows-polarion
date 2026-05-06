@@ -26,7 +26,10 @@ on:
       build-command:
         description: |
           Shell command(s) used to build the Java code so CodeQL can extract it.
-          Defaults to a compile-only Maven build; tests/javadoc/source jars are skipped.
+          Defaults to a Maven `clean install` with tests, Javadoc, and source-jar
+          generation skipped. `install` (rather than `compile`) is used so that in
+          multi-module reactors downstream modules can resolve their compiled
+          siblings from the local repo during extraction.
         required: false
         type: string
         default: |
@@ -75,7 +78,7 @@ jobs:
           languages: java-kotlin
           build-mode: manual
           queries: ${{ inputs.query-suite }}
-      - name: Build (compile only — no tests, no Sonar)
+      - name: Build (skip tests, Javadoc, source jars)
         shell: bash
         run: bash -c "$BUILD_COMMAND"
       - name: Perform CodeQL Analysis
