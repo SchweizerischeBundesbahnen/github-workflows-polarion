@@ -354,4 +354,4 @@ jobs:
                 ]
               }
             }
-          claude_args: --max-turns 30 --model opus
+          claude_args: --max-turns 40 --model opus
