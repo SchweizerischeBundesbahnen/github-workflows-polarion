@@ -2,5 +2,18 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>SchweizerischeBundesbahnen/casc-renovate-preset-polarion"
+  ],
+  "packageRules": [
+    {
+      "description": "Ungroup GitHub Actions so a single fast-releasing action cannot hold the whole group behind the minimumReleaseAge gate",
+      "matchManagers": ["github-actions"],
+      "groupName": null
+    },
+    {
+      "description": "anthropics/claude-code-action releases more often than the 3-day stability gate, so it never matures; track it with no soak so it updates",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["anthropics/claude-code-action"],
+      "minimumReleaseAge": "0 days"
+    }
   ]
 }
