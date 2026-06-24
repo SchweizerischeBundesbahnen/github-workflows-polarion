@@ -1,6 +1,13 @@
 ---
-# Blocks PR merges when the base branch pom.xml version is not a *-SNAPSHOT version.
+# Blocks merges when the target branch pom.xml version is not a *-SNAPSHOT version.
 # This prevents commits from landing after a release and before the snapshot version bump is merged.
+#
+# Works in two contexts:
+#   - pull_request: checks the PR base branch (github.base_ref).
+#   - push (e.g. Renovate branch automerge with no PR): checks the repository
+#     default branch, so the status check exists on the pushed commit and the
+#     "release-please-guard" required check can be satisfied on a direct push.
+#
 # Setup: add the "release-please-guard" status check as required in branch protection rules
 # and enable "Require branches to be up to date before merging".
 name: release-please-guard (reusable)
@@ -13,17 +20,20 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Check base branch version is SNAPSHOT
+      - name: Check target branch version is SNAPSHOT
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          BASE_BRANCH: ${{ github.base_ref }}
+          # On pull_request, github.base_ref is the PR target branch. On push
+          # (e.g. Renovate branch automerge with no PR) it is empty, so fall
+          # back to the repository default branch.
+          BASE_BRANCH: ${{ github.base_ref || github.event.repository.default_branch }}
           HEAD_BRANCH: ${{ github.head_ref }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |-
           set -euo pipefail
           if [[ -z "$BASE_BRANCH" ]]; then
-            echo "::error::BASE_BRANCH is empty. This workflow must be called from a pull_request context."
+            echo "::error::Could not determine the target branch (github.base_ref and default_branch are both empty)."
             exit 1
           fi
           if [[ "$HEAD_BRANCH" == release-please--* ]] && [[ "$PR_AUTHOR" == "github-actions[bot]" || "$PR_AUTHOR" == "release-please[bot]" ]]; then
