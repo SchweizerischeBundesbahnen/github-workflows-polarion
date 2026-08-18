@@ -79,7 +79,7 @@ jobs:
                       }
                     }
                   }
-                  reviews(first: 50) {
+                  reviews(first: 100) {
                     nodes {
                       id
                       databaseId
@@ -218,8 +218,22 @@ jobs:
             - STILL PRESENT: leave open, count in summary
             - ALREADY RESOLVED: skip
             Note: use thread `thread_id` for resolveReviewThread, comment `node_id`
-            (from REST) for minimizeComment. You cannot score 5/5 confidence
-            if unresolved issues remain.
+            (from REST) for minimizeComment. Threads left unresolved here are
+            one of the three conditions on the confidence score in step 8.
+
+            3b. MANDATORY — Process your OWN previous PR-level review bodies.
+            Use `bot_reviews` from classified-reviews.json, entries whose
+            `author_login` is `claude`. Their `body` is truncated to 200
+            characters, so read the full text with
+            `gh pr view NUMBER --json reviews --jq '.reviews[] | select(.author.login == "claude") | "\(.commit.oid)\n\(.body)"'`.
+            These carry every finding of every earlier round that could not be
+            posted inline, and no thread exists for them, so this step is the
+            only place they are tracked. For each finding in them, read the
+            CURRENT file content and state whether it is FIXED or STILL OPEN in
+            the step 8 summary. Do NOT re-raise a finding you already made in an
+            earlier round — report it as still open instead, and do NOT raise a
+            new finding about wording you yourself introduced in a previous
+            round's suggested fix without saying so.
 
             4. MANDATORY — Triage bot reviewer comments (Copilot, Greptile, etc.).
             First, if Copilot is enabled, wait for it:
@@ -304,8 +318,14 @@ jobs:
             - `## Claude Code Review Summary` (or `## ✅ No issues found` /
               `## ℹ️ No new issues found — N bot reviewer finding(s) and M human reviewer finding(s) acknowledged`)
             - `<details><summary><h3>Confidence Score: X/5</h3></summary>`
-              with brief assessment (5/5 = simple changes fully understood,
-              3/5 = complex changes needing human judgment)
+              This scores the REVIEW, not the change. Score 5/5 only when all
+              three hold: this round raised no finding that is left open, no
+              thread or prior-round finding from step 3 or 3b is still open,
+              and every claim in the body was verified by a Read, an executed
+              command or a cited source. Otherwise score 4/5 and name in one
+              clause which of the three failed. Score 3/5 or below only where
+              the change needs human judgment you could not supply. Never
+              present the score as a severity signal.
             - `<details><summary><h3>Bot Review Triage</h3></summary>`
               with triage of `bot_threads` ONLY, grouped by `author_login`
               (OMIT if `bot_threads` is empty)
@@ -354,4 +374,12 @@ jobs:
                 ]
               }
             }
-          claude_args: --max-turns 40 --model opus --effort high
+          # --allowedTools is what registers the github_inline_comment MCP server:
+          # install-mcp-server.ts starts it only when the allowed-tools list carries an
+          # mcp__github_inline_comment__ prefix, and in agent mode that list is parsed
+          # from claude_args alone. settings.permissions.allow governs whether a tool may
+          # be called, never whether its server is started, so declaring it there left
+          # every review without inline comments.
+          claude_args: >-
+            --max-turns 40 --model opus --effort high
+            --allowedTools "Read,Grep,Glob,BatchTool,mcp__github_inline_comment__create_inline_comment,Bash(gh pr review:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*)"
