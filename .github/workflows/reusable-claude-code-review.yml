@@ -160,6 +160,16 @@ jobs:
             human: (.human_reviews | length),
             bot: (.bot_reviews | length)
           }' /tmp/classified-reviews.json
+
+          # Round number for the escalating reporting bar in the prompt. Counted here
+          # rather than left to the model, which cannot count its own history reliably.
+          # Only claude reviews carrying a body are rounds: a review posted as the
+          # container for inline comments has an empty body and is not a round.
+          review_round=$(jq '[.bot_reviews[]
+            | select(.author_login == "claude" and (.body | length) > 0)] | length + 1' \
+            /tmp/classified-reviews.json)
+          echo "review_round=$review_round" >> "$GITHUB_OUTPUT"
+          echo "=== Review round: $review_round ==="
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@9d7150bc8a3dae8149739a88019d192b579ad90c  # v1.0.193
@@ -292,6 +302,25 @@ jobs:
             issues scoring >= 80. Do NOT review unchanged code, style/formatting,
             optional improvements, or dependency versions.
 
+            ROUND DISCIPLINE. This is review round
+            ${{ steps.classify-threads.outputs.review_round }} of this pull
+            request. Every round costs a full job and forces another push, so
+            the bar for raising a finding rises with the count. Apply the band
+            for this round, and name the band you applied in the summary:
+            - Rounds 1-3: report anything meeting the step 6 criteria above.
+            - Rounds 4-6: report ONLY findings that change behaviour — what the
+              code does, or what a reader of an instruction file does. Withhold
+              wording, ordering, phrasing and structure findings however real
+              they are, and list them in ONE line as deliberately withheld.
+            - Rounds 7 and beyond: report ONLY bugs, security issues and
+              breaking changes. State that the round cap is reached and that
+              any remaining concern is now a decision for a human reviewer
+              rather than another round.
+            Before raising a finding about text that a PREVIOUS round of yours
+            asked for, say so explicitly and hold it to this round's band. A
+            round whose findings are all traceable to your own earlier
+            suggestions is a signal to stop, not a reason to continue.
+
             7. Post inline comments for issues found in step 6 using
             `mcp__github_inline_comment__create_inline_comment`
             with `confirmed: true`. Only comment on lines in the diff (NEW version).
@@ -315,7 +344,8 @@ jobs:
             Severity is communicated through inline comments and the
             confidence score, not the review event type.
             The review body should contain:
-            - `## Claude Code Review Summary` (or `## ✅ No issues found` /
+            - `## Claude Code Review Summary — round ${{ steps.classify-threads.outputs.review_round }}`
+              (or `## ✅ No issues found` /
               `## ℹ️ No new issues found — N bot reviewer finding(s) and M human reviewer finding(s) acknowledged`)
             - `<details><summary><h3>Confidence Score: X/5</h3></summary>`
               This scores the completeness of the REVIEW, never the risk of
