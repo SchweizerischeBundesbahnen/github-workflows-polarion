@@ -1,0 +1,29 @@
+---
+name: Tool list parity
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - .github/workflows/**
+      - .github/scripts/check_tool_list_parity.py
+  workflow_dispatch:
+permissions: {}
+jobs:
+  tool-list-parity:
+    name: Assert claude-code-action tool lists agree
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with:
+          python-version: "3.x"
+      - run: pip install pyyaml
+      # Fails when a tool is declared in settings.permissions.allow but not in
+      # claude_args --allowedTools, or the reverse. Both directions fail
+      # silently at runtime, which is why they are asserted here.
+      - run: python .github/scripts/check_tool_list_parity.py .github/workflows/*.yml
