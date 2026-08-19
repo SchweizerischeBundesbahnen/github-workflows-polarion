@@ -82,6 +82,14 @@ def parse_settings_allow(settings: object) -> set[str] | None:
         with open(text.strip(), encoding="utf-8") as handle:
             text = handle.read()
     allow = json.loads(text).get("permissions", {}).get("allow")
+    if allow is not None and not isinstance(allow, list):
+        # set() over a str yields its characters. A non-list allow would become a
+        # set of single letters, none of which start with mcp__, so the
+        # settings-only branch below would find no servers and pass — a silent
+        # pass on exactly the configuration this script exists to catch. Reject
+        # it: permissions.allow is a JSON array, so anything else is malformed
+        # input worth naming rather than coercing.
+        raise TypeError(f"permissions.allow is {type(allow).__name__}, not a list")
     return None if allow is None else set(allow)
 
 
