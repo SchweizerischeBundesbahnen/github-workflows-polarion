@@ -14,10 +14,17 @@ on:
 permissions: {}
 jobs:
   claude-review:
-    # Skip Claude review for bot PRs and fork PRs
+    # Skip Claude review for bot PRs, fork PRs and drafts.
+    #
+    # Drafts are skipped because callers subscribe to `synchronize`, so every
+    # push to a work-in-progress branch would otherwise cost a full review.
+    # The `ready_for_review` trigger already encodes the intent that a draft
+    # waits: the review runs once the pull request is marked ready, and on
+    # every push after that.
     if: |
       !contains(github.event.pull_request.user.login, '[bot]') &&
-      github.event.pull_request.head.repo.fork == false
+      github.event.pull_request.head.repo.fork == false &&
+      github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
       actions: read  # Required for claude-code-action github_ci MCP server
@@ -395,6 +402,17 @@ jobs:
             the review body, with the single exception of Carried Findings.
 
             RULES:
+            - Every read of this pull request's own review state is taken
+              BEFORE your review is posted and therefore does not count it.
+              This applies to how many reviews name a commit, which commit
+              the newest review body names, and how many threads are
+              unresolved. A maintainer who re-runs the query after your
+              review lands gets a different answer, so never present such a
+              value as the reader's current state: either scope it in time
+              ("before this review, no body named HEAD") or add this review
+              to the count. Never let such a value be the only evidence for
+              a finding — the finding may be right while the evidence given
+              for it is already false when it is read.
             - Before reporting that a string is stale or wrong, you MUST
               `Read` the file and verify the exact claimed text appears on
               the claimed line. Quote from the Read output verbatim, never
