@@ -47,13 +47,17 @@ rules:
                   $FACTORY = SAXParserFactory.newInstance();
                   ...
                   $FACTORY.newSAXParser();
-          # ACCESS_EXTERNAL_DTD / ACCESS_EXTERNAL_SCHEMA set to "" is the
-          # alternative OWASP documents where DOCTYPE cannot be disabled, so it
-          # clears the rule. FEATURE_SECURE_PROCESSING is deliberately NOT
-          # accepted: OWASP records that it "may not always mitigate entity
-          # expansion" and is supplementary, so treating it as hardening would
-          # be a false negative.
-          - pattern-not-regex: 'disallow-doctype-decl|ACCESS_EXTERNAL_DTD|ACCESS_EXTERNAL_SCHEMA'
+          # ACCESS_EXTERNAL_DTD set to "" is the alternative OWASP documents
+          # where DOCTYPE cannot be disabled, so it clears the rule. The empty
+          # value is part of the pattern: `ACCESS_EXTERNAL_DTD, "file"` still
+          # resolves file:// external entities, so matching the constant name
+          # alone would clear the rule on code that is still exposed.
+          # ACCESS_EXTERNAL_SCHEMA is not accepted on its own — restricting
+          # schema resolution does nothing about DOCTYPE processing or external
+          # general entities. FEATURE_SECURE_PROCESSING is not accepted either:
+          # OWASP records that it "may not always mitigate entity expansion"
+          # and treats it as supplementary.
+          - pattern-not-regex: 'disallow-doctype-decl|ACCESS_EXTERNAL_DTD[^,)]*,\s*""'
       - patterns:
           - pattern: |
               $FACTORY = XMLInputFactory.newInstance();

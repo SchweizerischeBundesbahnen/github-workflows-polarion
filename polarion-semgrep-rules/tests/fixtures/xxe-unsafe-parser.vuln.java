@@ -34,4 +34,24 @@ public class XxeVulnerable {
             reader.next();
         }
     }
+
+    // ACCESS_EXTERNAL_DTD set to a non-empty value still resolves file://
+    // external entities, so naming the constant is not hardening.
+    // ruleid: polarion-xxe-unsafe-parser
+    public Document parseDocDtdNotEmptied(String xml) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD, "file");
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        return builder.parse(new InputSource(new StringReader(xml)));
+    }
+
+    // Restricting schema resolution alone addresses neither DOCTYPE processing
+    // nor external general entities.
+    // ruleid: polarion-xxe-unsafe-parser
+    public Document parseDocSchemaOnly(String xml) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        return builder.parse(new InputSource(new StringReader(xml)));
+    }
 }

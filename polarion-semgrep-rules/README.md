@@ -43,7 +43,7 @@ passing on a bare `> 0`. A case the rule is known not to reach carries
 | `polarion-get-with-write-transaction` | ERROR | A `@GET` method that opens a write transaction. |
 | `polarion-transaction-no-permission-check` | INFO | A write transaction opened without an explicit permission check. |
 | `polarion-velocity-ssti` | ERROR | `VelocityEngine` constructed without `SecureUberspector`, which exposes Java reflection to template authors. |
-| `polarion-xxe-unsafe-parser` | ERROR | `DocumentBuilderFactory` / `SAXParserFactory` / `XMLInputFactory` created without `disallow-doctype-decl`, `ACCESS_EXTERNAL_DTD` or `ACCESS_EXTERNAL_SCHEMA`. |
+| `polarion-xxe-unsafe-parser` | ERROR | `DocumentBuilderFactory` / `SAXParserFactory` / `XMLInputFactory` created without `disallow-doctype-decl` or an emptied `ACCESS_EXTERNAL_DTD`. |
 | `polarion-hardcoded-creds-config` | ERROR | A non-placeholder credential in a `.properties` or `.xml` configuration file. |
 | `polarion-workflow-function-no-authz` | WARNING | A workflow function `execute(...)` that consults neither the invoking user nor a permission check. Matches whether or not the body mutates anything — see the gaps below. |
 | `polarion-weasyprint-pre-68` | ERROR | The WeasyPrint sidecar pinned below 68 (CVE-2025-68616). |
@@ -109,12 +109,16 @@ repeated in the header of the rule it applies to.
   the pattern is not a one-line change — adding a `pattern-regex` narrows the
   match region so the `SecureUberspector` suppression stops working — so it is
   tracked separately rather than bundled here.
-- **`polarion-xxe-unsafe-parser` accepts two hardening forms, not three.**
-  `disallow-doctype-decl` and emptied `ACCESS_EXTERNAL_DTD` /
-  `ACCESS_EXTERNAL_SCHEMA` both clear the rule. `FEATURE_SECURE_PROCESSING` does
-  not, deliberately: OWASP records that it "may not always mitigate entity
-  expansion" and treats it as supplementary, so accepting it would turn the rule
-  off on code that is still exposed.
+- **`polarion-xxe-unsafe-parser` accepts exactly two hardening forms.**
+  `disallow-doctype-decl`, and `ACCESS_EXTERNAL_DTD` set to an empty string. The
+  empty value is part of the check: `ACCESS_EXTERNAL_DTD, "file"` still resolves
+  `file://` external entities, so matching the constant name alone would clear
+  the rule on code that is still exposed. `ACCESS_EXTERNAL_SCHEMA` on its own
+  does not clear it either, because restricting schema resolution addresses
+  neither DOCTYPE processing nor external general entities. Nor does
+  `FEATURE_SECURE_PROCESSING`: OWASP records that it "may not always mitigate
+  entity expansion" and treats it as supplementary. Both negative cases are
+  pinned in the vulnerable fixture.
 - **`polarion-workflow-function-no-authz` cannot read `workflow.xml`, and does
   not require a mutation.** Whether the transition itself is role-restricted is
   outside the rule's reach. The precisely-typed
