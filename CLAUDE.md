@@ -35,6 +35,14 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 
 `claude-code-action` with `claude_code_oauth_token` (OIDC) requires the triggering actor to have write access to the repo. Bot-triggered `pull_request_review` events (e.g. from `copilot-pull-request-reviewer[bot]`) fail with 401 because the bot actor lacks write access. This means a separate triage workflow triggered by `pull_request_review` is **not viable** with OAuth auth. Bot reviewer triage must stay within the main review prompt (triggered by `pull_request` where the actor is the PR author).
 
+### Known Limitation: a PR editing a caller workflow gets no Claude review
+
+`claude-code-action` requires the **triggering caller** workflow file to be identical to its version on the default branch. Where it differs, the OIDC token exchange returns a workflow-validation error, the action logs `Workflow validation failed`, throws `WorkflowValidationSkipError` — which its retry wrapper explicitly excludes from retry — and the step still exits 0. The job is green, no review is posted, and nothing on the pull request surface says so.
+
+The guard covers the caller only, not the reusable workflow it calls: PR #88 changed `reusable-claude-code-review.yml` alone and received a full review, while PR #91 also changed `claude-code-review.yml` and received none (measured 2026-08-19 on run `32273783450`).
+
+So a change to a caller workflow cannot be reviewed by Claude on its own branch and only takes effect once merged. Never read a green `claude-review` check on such a pull request as a clean review.
+
 ## Pre-commit
 
 This repo uses pre-commit hooks including `zizmor` (GitHub Actions security linter) and `actionlint` (workflow syntax checker). Commits that fail these checks should not be pushed.
