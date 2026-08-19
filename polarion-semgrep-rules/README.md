@@ -119,6 +119,14 @@ repeated in the header of the rule it applies to.
   `FEATURE_SECURE_PROCESSING`: OWASP records that it "may not always mitigate
   entity expansion" and treats it as supplementary. Both negative cases are
   pinned in the vulnerable fixture.
+- **The `ACCESS_EXTERNAL_DTD` form clears DOM only, not SAX.**
+  `SAXParserFactory` has no `setAttribute`, so the SAX route to that hardening is
+  `parser.setProperty(...)` after `newSAXParser()`, which falls outside the
+  matched region — SAX code hardened that way is reported at ERROR. Widening the
+  SAX pattern past the factory call was tried and made it worse: the region
+  overlaps itself, producing duplicate findings on unhardened code without
+  clearing the hardened case. `disallow-doctype-decl` is unaffected on both
+  branches, because `factory.setFeature(...)` precedes `newSAXParser()`.
 - **`polarion-workflow-function-no-authz` cannot read `workflow.xml`, and does
   not require a mutation.** Whether the transition itself is role-restricted is
   outside the rule's reach. The precisely-typed

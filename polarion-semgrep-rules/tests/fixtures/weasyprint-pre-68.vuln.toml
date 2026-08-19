@@ -21,6 +21,10 @@ dependencies = [
     # selects the same release as `==51.0`.
     # ruleid: polarion-weasyprint-pre-68
     "weasyprint==51",
+    # Compound specifier: the cap is not adjacent to the name, and this
+    # resolves to 67.x.
+    # ruleid: polarion-weasyprint-pre-68
+    "weasyprint>=66,<68",
     "defusedxml==0.7.1",
     "fastapi==0.136.1",
     "uvicorn==0.46.0",

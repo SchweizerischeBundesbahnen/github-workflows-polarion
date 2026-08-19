@@ -48,7 +48,13 @@ rules:
       # bare integers — the oldest and most exposed versions the rule exists to
       # catch. `\b` keeps 68, 69 and 600 out.
       - pattern-regex: '(?i)weasyprint\s*==\s*(?:6[0-7]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
-      - pattern-regex: '(?i)weasyprint\s*<\s*68'
-      - pattern-regex: '(?i)weasyprint\s*<=\s*67\b'
+      # `[^"\n]*` rather than `\s*` before the operator: `>=66,<68` is the
+      # ordinary way to cap below a bad release and resolves to 67.x, which
+      # `weasyprint\s*<` cannot see. The class stays inside one quoted specifier
+      # in pyproject.toml and inside one line in requirements.txt, so it cannot
+      # reach a neighbouring dependency. `6[0-8]` on the `<` branch keeps `<68`
+      # while leaving `<69` alone, since `<69` installs the patched 68.x.
+      - pattern-regex: '(?i)weasyprint[^"\n]*<\s*(?:6[0-8]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
+      - pattern-regex: '(?i)weasyprint[^"\n]*<=\s*(?:6[0-7]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
       # requirements.txt-ish: weasyprint==NN.M with no extras
       - pattern-regex: '(?im)^\s*weasyprint\s*==\s*(?:6[0-7]|[0-5][0-9]?)\b(?:\.[0-9]+)*\s*$'

@@ -57,6 +57,13 @@ rules:
           # general entities. FEATURE_SECURE_PROCESSING is not accepted either:
           # OWASP records that it "may not always mitigate entity expansion"
           # and treats it as supplementary.
+          #
+          # KNOWN LIMITATION: this clause can only clear the DocumentBuilder
+          # branch. SAXParserFactory has no setAttribute, so the SAX route to
+          # ACCESS_EXTERNAL_DTD is parser.setProperty(...) AFTER newSAXParser(),
+          # which falls outside the matched region — hardened SAX code of that
+          # shape is a false positive. disallow-doctype-decl is unaffected,
+          # because factory.setFeature(...) precedes newSAXParser().
           - pattern-not-regex: 'disallow-doctype-decl|ACCESS_EXTERNAL_DTD[^,)]*,\s*""'
       - patterns:
           - pattern: |
