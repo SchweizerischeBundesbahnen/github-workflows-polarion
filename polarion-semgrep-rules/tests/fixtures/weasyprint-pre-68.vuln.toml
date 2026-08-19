@@ -29,3 +29,11 @@ dependencies = [
     "fastapi==0.136.1",
     "uvicorn==0.46.0",
 ]
+
+# Assignment form: the whole specifier is its own quoted string. This is the only
+# dependency syntax a Pipfile has, and the poetry table shares it, so the same
+# alternative covers both — the self-test pairs one fixture per rule by name, so
+# a separate Pipfile fixture would need a harness change.
+[tool.poetry.dependencies]
+# ruleid: polarion-weasyprint-pre-68
+weasyprint = "^67.0"

@@ -119,6 +119,13 @@ repeated in the header of the rule it applies to.
   `FEATURE_SECURE_PROCESSING`: OWASP records that it "may not always mitigate
   entity expansion" and treats it as supplementary. Both negative cases are
   pinned in the vulnerable fixture.
+- **`polarion-weasyprint-pre-68` cannot match `poetry.lock`.** A lock file
+  splits the name and the version across two lines (`name = "weasyprint"` then
+  `version = "67.0"`), which no single-line pattern can join. `*poetry.lock`
+  stays in `paths.include` so a future cross-line alternative needs no change
+  there, but today the entry scans nothing. `*.toml`, `*.txt` and `*Pipfile*`
+  are covered, including the assignment form both Pipfile and the poetry
+  dependency table use.
 - **The `ACCESS_EXTERNAL_DTD` form clears DOM only, not SAX.**
   `SAXParserFactory` has no `setAttribute`, so the SAX route to that hardening is
   `parser.setProperty(...)` after `newSAXParser()`, which falls outside the
