@@ -10,7 +10,13 @@ version = "0.0.0"
 requires-python = ">=3.14,<3.15"
 
 dependencies = [
+    # ruleid: polarion-weasyprint-pre-68
     "weasyprint==67.0",
+    # Canonical PyPI spelling. Requirement names are case-insensitive per
+    # PEP 503, and `pip freeze` emits this form, so a case-sensitive rule
+    # turned itself off silently.
+    # ruleid: polarion-weasyprint-pre-68
+    "WeasyPrint==66.0",
     "defusedxml==0.7.1",
     "fastapi==0.136.1",
     "uvicorn==0.46.0",

@@ -14,7 +14,7 @@ consumer repositories, and duplicating them only adds alerts.
 ```
 polarion-semgrep-rules/
 ├── SEMGREP_VERSION        # pinned semgrep version, single source of truth
-├── rules/*.yaml           # one rule per file, id == filename
+├── rules/*.yaml           # one rule per file, id == filename (.yml also loaded)
 └── tests/
     ├── fixtures/          # <rule>.vuln.<ext> and <rule>.fixed.<ext> per rule
     └── test_rules.sh      # asserts each rule fires on vuln only
@@ -29,7 +29,11 @@ SEMGREP="uvx semgrep==$(cat polarion-semgrep-rules/SEMGREP_VERSION)" \
 
 `jq` is required. A rule missing either fixture fails the suite rather than
 being skipped, and the number of rules tested is asserted against the number of
-rule files, so a suite that checked nothing cannot report success.
+rule files, so a suite that checked nothing cannot report success. The
+vulnerable fixture's `ruleid:` annotations are the expected finding count, so a
+rule that regresses from matching five cases to matching one fails rather than
+passing on a bare `> 0`. A case the rule is known not to reach carries
+`known-miss:` instead, and is not counted.
 
 ## Rules
 
@@ -39,9 +43,9 @@ rule files, so a suite that checked nothing cannot report success.
 | `polarion-get-with-write-transaction` | ERROR | A `@GET` method that opens a write transaction. |
 | `polarion-transaction-no-permission-check` | INFO | A write transaction opened without an explicit permission check. |
 | `polarion-velocity-ssti` | ERROR | `VelocityEngine` constructed without `SecureUberspector`, which exposes Java reflection to template authors. |
-| `polarion-xxe-unsafe-parser` | ERROR | `DocumentBuilderFactory` / `SAXParserFactory` / `XMLInputFactory` created without disabling external entities. |
+| `polarion-xxe-unsafe-parser` | ERROR | `DocumentBuilderFactory` / `SAXParserFactory` / `XMLInputFactory` created without `disallow-doctype-decl`, `ACCESS_EXTERNAL_DTD` or `ACCESS_EXTERNAL_SCHEMA`. |
 | `polarion-hardcoded-creds-config` | ERROR | A non-placeholder credential in a `.properties` or `.xml` configuration file. |
-| `polarion-workflow-function-no-authz` | WARNING | A workflow function `execute(...)` body that mutates state without consulting the invoking user. |
+| `polarion-workflow-function-no-authz` | WARNING | A workflow function `execute(...)` that consults neither the invoking user nor a permission check. Matches whether or not the body mutates anything — see the gaps below. |
 | `polarion-weasyprint-pre-68` | ERROR | The WeasyPrint sidecar pinned below 68 (CVE-2025-68616). |
 
 ## Baseline on the target corpus
@@ -93,12 +97,32 @@ repeated in the header of the rule it applies to.
   the request's actual user, not as an elevated subject. Extension-level
   `checkPermission` is therefore defense-in-depth. The rule still catches
   mutations made outside a platform API — raw JDBC, direct file IO, reflection.
-- **`polarion-velocity-ssti` matches at method scope.** A `SecureUberspector`
-  configured through class-scope constants is invisible to the method-level
-  `pattern-not-regex`, so that shape produces a false positive.
-- **`polarion-workflow-function-no-authz` cannot read `workflow.xml`.** Whether
-  the transition itself is role-restricted is outside the rule's reach, so the
-  finding is raised for human review rather than as a definite defect.
+- **`polarion-velocity-ssti` matches at method scope, in both directions.** A
+  `SecureUberspector` configured through class-scope constants is invisible to
+  the method-level `pattern-not-regex`, so that shape produces a false positive.
+  In the other direction the rule requires `new VelocityEngine(...)` as a bare
+  statement inside a method declaration, so three shapes are missed silently: a
+  field initializer (`private static final VelocityEngine ENGINE = new
+  VelocityEngine();`), a construction inside a constructor, which has no return
+  type for the pattern to bind, and `return new VelocityEngine(props);`. The
+  last of these is annotated `known-miss:` in the vulnerable fixture. Widening
+  the pattern is not a one-line change — adding a `pattern-regex` narrows the
+  match region so the `SecureUberspector` suppression stops working — so it is
+  tracked separately rather than bundled here.
+- **`polarion-xxe-unsafe-parser` accepts two hardening forms, not three.**
+  `disallow-doctype-decl` and emptied `ACCESS_EXTERNAL_DTD` /
+  `ACCESS_EXTERNAL_SCHEMA` both clear the rule. `FEATURE_SECURE_PROCESSING` does
+  not, deliberately: OWASP records that it "may not always mitigate entity
+  expansion" and treats it as supplementary, so accepting it would turn the rule
+  off on code that is still exposed.
+- **`polarion-workflow-function-no-authz` cannot read `workflow.xml`, and does
+  not require a mutation.** Whether the transition itself is role-restricted is
+  outside the rule's reach. The precisely-typed
+  `execute(IArguments, IActionContext)` signature also matches a read-only body,
+  which is intentional — the signature is strong evidence of a workflow function
+  and a read-only body is one edit from a mutating one — so the finding is raised
+  for human review rather than as a definite defect, and a genuinely read-only
+  function is a valid dismissal.
 
 ## Consuming the pack from CI
 

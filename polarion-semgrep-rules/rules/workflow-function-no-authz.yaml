@@ -3,9 +3,16 @@ rules:
     languages: [java]
     severity: WARNING
     message: |
-      Polarion workflow function `execute(...)` body mutates state without
-      consulting the invoking user identity (`actionContext.getCurrentUser()`)
-      or calling a permission check.
+      Polarion workflow function `execute(...)` does not consult the invoking
+      user identity (`actionContext.getCurrentUser()`) and does not call a
+      permission check.
+
+      The precisely-typed `execute(IArguments, IActionContext)` signature is
+      matched whether or not the body mutates anything, deliberately: the
+      signature is strong evidence of a workflow function, and a read-only body
+      today is one edit away from a mutating one. So this finding is raised for
+      human review rather than as a definite defect — a genuinely read-only
+      function is a valid dismissal.
 
       Workflow functions run with elevated authority — the workflow engine
       invokes them as the system user. If the function mutates `IPObject`

@@ -47,6 +47,10 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      # Documented as required for upload-sarif in private repositories; the
+      # consumer's visibility decides, not this repository's. Costs nothing on a
+      # public caller and is the same grant reusable-codeql-java.yml makes.
+      actions: read
     env:
       # Inputs are read through env rather than interpolated into `run:` so a
       # caller-supplied value cannot be expanded as shell source.

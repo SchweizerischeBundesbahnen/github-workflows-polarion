@@ -15,7 +15,9 @@ public class VelocitySstiVulnerable {
         return writer.toString();
     }
 
-    // ruleid: polarion-velocity-ssti
+    // known-miss: polarion-velocity-ssti — `return new VelocityEngine(...)` is
+    // not a bare statement, so the method-scoped pattern does not reach it. See
+    // "Known rule gaps" in the pack README.
     public VelocityEngine buildEngine() {
         // Even with custom Properties, missing SecureUberspector is unsafe.
         java.util.Properties props = new java.util.Properties();

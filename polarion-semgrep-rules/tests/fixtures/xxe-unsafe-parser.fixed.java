@@ -31,6 +31,16 @@ public class XxeFixed {
         parser.parse(new InputSource(new StringReader(xml)), null);
     }
 
+    // ok: polarion-xxe-unsafe-parser — ACCESS_EXTERNAL_DTD/SCHEMA emptied, the
+    // alternative OWASP documents where DOCTYPE cannot be disabled
+    public Document parseDocNoExternalAccess(String xml) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        return builder.parse(new InputSource(new StringReader(xml)));
+    }
+
     // ok: polarion-xxe-unsafe-parser — external entities disabled on StAX
     public void parseStax(String xml) throws Exception {
         XMLInputFactory factory = XMLInputFactory.newInstance();

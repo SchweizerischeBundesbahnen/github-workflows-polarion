@@ -10,6 +10,16 @@
 # untested rule ship while the suite still reported success. The rule count is
 # asserted against the number tested for the same reason.
 #
+# Both .yaml and .yml are enumerated, because the workflow passes the whole
+# rules/ directory to `--config` and semgrep's directory loader reads both. A
+# glob over one extension only would ship the other to every consumer untested,
+# and the rule-count assertion could not see it either.
+#
+# The vulnerable fixture's `ruleid:` annotations are the expected finding count,
+# not merely documentation: asserting `> 0` passes a rule that has regressed
+# from matching five cases to matching one. A case the rule is known not to
+# reach is annotated `known-miss:` instead, which this suite does not count.
+#
 # Override the semgrep invocation via SEMGREP (default: `semgrep`), e.g.
 #   SEMGREP="uvx semgrep==1.172.0" bash tests/test_rules.sh
 
@@ -42,7 +52,7 @@ count_findings() {
     printf '%s' "${json}" | jq '.results | length'
 }
 
-rules=("${RULES_DIR}"/*.yaml)
+rules=("${RULES_DIR}"/*.yaml "${RULES_DIR}"/*.yml)
 if [[ ${#rules[@]} -eq 0 ]]; then
     echo "ERROR: no rules found in ${RULES_DIR}" >&2
     exit 1
@@ -52,7 +62,9 @@ failed=0
 tested=0
 
 for rule in "${rules[@]}"; do
-    name=$(basename "${rule}" .yaml)
+    name=$(basename "${rule}")
+    name="${name%.yaml}"
+    name="${name%.yml}"
     # Fixture extension varies by rule language (.java, .properties, .toml).
     vuln=("${FIXTURES_DIR}/${name}".vuln.*)
     fixed=("${FIXTURES_DIR}/${name}".fixed.*)
@@ -64,15 +76,23 @@ for rule in "${rules[@]}"; do
         continue
     fi
 
+    # Expected count comes from the fixture's own `ruleid:` annotations.
+    expected=$(grep -cE '^[[:space:]]*(#|//)[[:space:]]*ruleid:' "${vuln[0]}" || true)
+    if [[ "${expected}" -eq 0 ]]; then
+        printf 'FAIL: %-40s vulnerable fixture carries no `ruleid:` annotation\n' "${name}"
+        failed=$((failed + 1))
+        continue
+    fi
+
     n_vuln=$(count_findings "${rule}" "${vuln[0]}")
     n_fixed=$(count_findings "${rule}" "${fixed[0]}")
     tested=$((tested + 1))
 
-    if [[ "${n_vuln}" -gt 0 && "${n_fixed}" -eq 0 ]]; then
-        printf 'PASS: %-40s vuln=%s fixed=%s\n' "${name}" "${n_vuln}" "${n_fixed}"
+    if [[ "${n_vuln}" -eq "${expected}" && "${n_fixed}" -eq 0 ]]; then
+        printf 'PASS: %-40s vuln=%s/%s fixed=%s\n' "${name}" "${n_vuln}" "${expected}" "${n_fixed}"
     else
-        printf 'FAIL: %-40s vuln=%s (expected >0) fixed=%s (expected 0)\n' \
-            "${name}" "${n_vuln}" "${n_fixed}"
+        printf 'FAIL: %-40s vuln=%s (expected %s) fixed=%s (expected 0)\n' \
+            "${name}" "${n_vuln}" "${expected}" "${n_fixed}"
         failed=$((failed + 1))
     fi
 done

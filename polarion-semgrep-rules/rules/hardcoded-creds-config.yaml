@@ -38,10 +38,14 @@ rules:
       # .properties: key=value where value is non-empty AND not a
       # ${env.X} / ${sys.X} / @PLACEHOLDER@ form.
       - patterns:
-          - pattern-regex: '(?im)^\s*(db\.password|ldap\.password|admin\.password|api\.?key|api\.?secret|client\.?secret|jdbc\.password|mail\.password)\s*=\s*[^\s$@\n].*$'
+          # `[ \t]` rather than `\s`: `\s` crosses a newline under (?m), so
+          # `api.key=` (empty, intentionally unset) matched into the following
+          # line. That is what a `pattern-not-regex: '=\s*$'` clause used to
+          # suppress — and it also suppressed every base64-padded secret, which
+          # is the shape most real leaked credentials have.
+          - pattern-regex: '(?im)^[ \t]*(db\.password|ldap\.password|admin\.password|api\.?key|api\.?secret|client\.?secret|jdbc\.password|mail\.password)[ \t]*=[ \t]*[^\s$@][^\n]*$'
           - pattern-not-regex: '\$\{[^}]+\}'
           - pattern-not-regex: '@[A-Z_]+@'
-          - pattern-not-regex: '=\s*$'
       # XML: <password>x</password> with non-placeholder content.
       - patterns:
           - pattern-regex: '(?is)<(?:password|secret|apikey|api-key|client-secret)>\s*[^<\s$@][^<]*</(?:password|secret|apikey|api-key|client-secret)>'
