@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-This repository contains **GitHub Actions workflows (reusable and caller/CI)**. There is no application code, no build system, and no tests. All files of interest live under `.github/workflows/`.
+This repository contains **GitHub Actions workflows (reusable and caller/CI)** and the Polarion Semgrep rule pack that one of them runs. There is no application code and no build system.
 
 ## Repository Structure
 
@@ -20,6 +20,8 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 - Reusable workflows accept secrets via `workflow_call` — never hardcode secrets or tokens
 - Use `${{ github.repository_owner }}` instead of hardcoding the org name to keep workflows portable
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
+- `polarion-semgrep-rules/tests/fixtures/` holds deliberately vulnerable Java and configuration files. A workflow that scans a consumer repository must exclude the rule pack checkout path, or the fixtures are reported as findings against that repository
+- Verify a rule-pack change with `SEMGREP="uvx semgrep==$(cat polarion-semgrep-rules/SEMGREP_VERSION)" bash polarion-semgrep-rules/tests/test_rules.sh` — without the `SEMGREP` override the suite runs whatever semgrep is on PATH, which is not the version the rule baseline was measured on
 
 ## Workflow Naming
 

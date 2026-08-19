@@ -1,0 +1,17 @@
+# Deliberately broken: WeasyPrint 67.0 is vulnerable to CVE-2025-68616
+# (SSRF protection bypass via HTTP redirect, CVSS 7.5 High, CWE-918/601).
+# Patch shipped in WeasyPrint 68.0.
+# Skill's dependency-CVE check must produce EXACTLY ONE critical finding
+# against this file, identifying CVE-2025-68616.
+
+[project]
+name = "weasyprint-service-broken"
+version = "0.0.0"
+requires-python = ">=3.14,<3.15"
+
+dependencies = [
+    "weasyprint==67.0",
+    "defusedxml==0.7.1",
+    "fastapi==0.136.1",
+    "uvicorn==0.46.0",
+]

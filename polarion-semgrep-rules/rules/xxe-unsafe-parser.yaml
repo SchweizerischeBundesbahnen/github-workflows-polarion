@@ -1,0 +1,56 @@
+rules:
+  - id: polarion-xxe-unsafe-parser
+    languages: [java]
+    severity: ERROR
+    message: |
+      XML parser instantiated without XXE protection. Polarion extensions
+      that parse user-supplied XML (settings imports, FOP/iText input,
+      JAX-RS payloads) are reachable by any authenticated user; an
+      attacker can submit a DOCTYPE with `&xxe;` references that the
+      parser dereferences server-side, leaking files or making outbound
+      requests from the Polarion host.
+
+      Set the relevant feature/property before parsing:
+
+        // DocumentBuilderFactory
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        // SAXParserFactory
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        // XMLInputFactory (StAX)
+        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+
+      OR delegate parsing to a hardened helper class.
+
+      See <https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/blob/main/polarion-semgrep-rules/README.md>.
+    metadata:
+      category: security
+      cwe:
+        - "CWE-611: Improper Restriction of XML External Entity Reference"
+        - "CWE-776: Improper Restriction of Recursive Entity References"
+      owasp:
+        - "A05:2021 - Security Misconfiguration"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      polarion-rule: true
+      references:
+        - https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  $FACTORY = DocumentBuilderFactory.newInstance();
+                  ...
+                  $FACTORY.newDocumentBuilder();
+              - pattern: |
+                  $FACTORY = SAXParserFactory.newInstance();
+                  ...
+                  $FACTORY.newSAXParser();
+          - pattern-not-regex: 'disallow-doctype-decl'
+      - patterns:
+          - pattern: |
+              $FACTORY = XMLInputFactory.newInstance();
+              ...
+              $FACTORY.createXMLStreamReader(...);
+          - pattern-not-regex: 'IS_SUPPORTING_EXTERNAL_ENTITIES|SUPPORT_DTD'

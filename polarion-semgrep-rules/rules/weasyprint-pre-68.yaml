@@ -1,0 +1,50 @@
+rules:
+  - id: polarion-weasyprint-pre-68
+    languages: [generic]
+    severity: ERROR
+    paths:
+      include:
+        - "*.toml"
+        - "*.txt"
+        - "*Pipfile*"
+        - "*poetry.lock"
+    message: |
+      WeasyPrint pinned at a version < 68.0. CVE-2025-68616 (CVSS 7.5 High,
+      CWE-918) — SSRF protection bypass via HTTP redirect. WeasyPrint's
+      `url_fetcher` validates the requested URL but the underlying urllib
+      follows redirects automatically *without* re-validating the
+      destination, letting an attacker bypass any allowlist by hosting a
+      302 to an internal address.
+
+      Concretely for SBB Polarion's weasyprint-service sidecar (the only
+      consumer in our threat model): a malicious user submits HTML
+      containing `<img src="https://attacker.example/redirect">`, the
+      sidecar's `url_fetcher` accepts the external URL, then urllib follows
+      the 302 to `http://169.254.169.254/...` (cloud metadata) or any
+      internal admin endpoint inside the SBB network — pivoting the
+      sidecar into the perimeter.
+
+      Patched in WeasyPrint 68.0. Bump to ≥ 68.0.
+
+      See <https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/blob/main/polarion-semgrep-rules/README.md>.
+    metadata:
+      category: security
+      cwe:
+        - "CWE-918: Server-Side Request Forgery (SSRF)"
+        - "CWE-601: URL Redirection to Untrusted Site"
+      owasp:
+        - "A10:2021 - Server-Side Request Forgery"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      polarion-rule: true
+      references:
+        - https://github.com/advisories/GHSA-983w-rhvv-gwmv
+        - https://github.com/SchweizerischeBundesbahnen/weasyprint-service
+    pattern-either:
+      # pyproject.toml: dependencies = [..., "weasyprint==X" or "weasyprint<Y" ...]
+      - pattern-regex: 'weasyprint\s*==\s*(?:6[0-7]\.[0-9]+|[0-5][0-9]?\.[0-9]+)'
+      - pattern-regex: 'weasyprint\s*<\s*68'
+      - pattern-regex: 'weasyprint\s*<=\s*67\.'
+      # requirements.txt-ish: weasyprint==NN.M with no extras
+      - pattern-regex: '(?m)^\s*weasyprint\s*==\s*(?:6[0-7]\.[0-9]+|[0-5][0-9]?\.[0-9]+)\s*$'

@@ -1,0 +1,63 @@
+rules:
+  - id: polarion-get-with-write-transaction
+    languages: [java]
+    severity: ERROR
+    message: |
+      `@GET` method opens a write transaction
+      (`TransactionalExecutor.executeInWriteTransaction`). Per REST conventions
+      `GET` should be side-effect-free; a state-changing `GET` endpoint is the
+      highest-severity CSRF case:
+
+        - Cross-origin attackers can trigger it via `<img src="…">`, which
+          sends NO `Origin` header → `CorsFilter` is silent.
+        - No CORS preflight is performed for `GET`, so the custom-header
+          defense provided by `@Secured` (`Authorization` / `X-Polarion-REST-Token`)
+          can't gate the request either.
+        - Browser SameSite-Lax cookies ARE sent on top-level `GET` navigations,
+          so the session cookie reaches the server.
+
+      Result: a single `<img src="https://polarion/…/internal/…">` in any
+      attacker-controlled page mutates state under the victim's identity.
+
+      Fix:
+        - Change the verb to `@POST` / `@PUT` / `@PATCH` / `@DELETE` (correct
+          REST), AND
+        - Add `@Secured` / `@RolesAllowed` / explicit `checkPermission(...)`.
+
+      If the endpoint genuinely must be `GET` and modify state, add an
+      explicit anti-CSRF token check (double-submit cookie or custom header
+      validation) and document why.
+
+      See the "Known rule gaps" section of
+      <https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/blob/main/polarion-semgrep-rules/README.md>.
+    metadata:
+      category: security
+      cwe:
+        - "CWE-352: Cross-Site Request Forgery"
+        - "CWE-862: Missing Authorization"
+      owasp:
+        - "A01:2021 - Broken Access Control"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      polarion-rule: true
+      references:
+        - https://owasp.org/www-community/attacks/csrf
+        - https://github.com/SchweizerischeBundesbahnen/ch.sbb.polarion.extension.generic/issues/400
+    pattern-either:
+      - patterns:
+          - pattern: |
+              @GET
+              $RET $METHOD(...) {
+                ...
+                TransactionalExecutor.executeInWriteTransaction(...);
+                ...
+              }
+      - patterns:
+          - pattern: |
+              @GET
+              $RET $METHOD(...) {
+                ...
+                $EXEC.executeInWriteTransaction(...);
+                ...
+              }

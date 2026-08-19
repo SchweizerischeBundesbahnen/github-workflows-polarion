@@ -1,0 +1,71 @@
+rules:
+  - id: polarion-transaction-no-permission-check
+    languages: [java]
+    severity: INFO
+    message: |
+      Write transaction does not contain an explicit
+      ISecurityService.checkPermission call.
+
+      Confirmed informational on the SBB Polarion extension stack:
+      Polarion platform APIs (IDataService, IRepositoryConnection,
+      IPObject mutations) self-check the active Subject's permissions
+      and throw PermissionDeniedException on rejection. The active
+      Subject is established by:
+
+        - /internal/* flows: DoAsFilter, from the FORM-authenticated
+          Polarion session (real user).
+        - /api/* flows: polarionService.callPrivileged(...), which
+          despite the name calls
+          securityService.doAsUser(RequestContextUtil.getUserSubject(), ...)
+          — i.e., runs the lambda as the request's actual user Subject
+          (the PAT holder or token holder), NOT as an elevated/admin
+          subject. Verified on
+          https://github.com/SchweizerischeBundesbahnen/ch.sbb.polarion.extension.generic/blob/main/app/src/main/java/ch/sbb/polarion/extension/generic/service/PolarionService.java
+          (callPrivileged at ~L282).
+
+      In both flows the platform self-check IS the authorization gate.
+      An extension-level checkPermission would be defense-in-depth, not
+      strictly required. This rule remains in the pack as:
+        - A regression guard against future code that mutates state
+          *outside* a platform API (e.g., direct SVN access without
+          IRepositoryConnection, or a future API path that does
+          elevate privileges).
+        - A reminder to confirm that the transaction body really does
+          go through platform APIs that check (not, e.g., a raw JDBC
+          mutation wrapped in TransactionalExecutor).
+
+      Reviewer action: confirm the transaction body's writes are made
+      via platform APIs (IRepositoryConnection, IPObject.* mutators,
+      IDataService). If yes, this is informational. If the body bypasses
+      the platform (raw JDBC, direct file IO under polarion's repo,
+      reflection on platform internals), treat as ERROR and add an
+      explicit checkPermission.
+
+      See <https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/blob/main/polarion-semgrep-rules/README.md>
+      and the README "REST architecture: /internal vs /api" section of
+      ch.sbb.polarion.extension.generic.
+    metadata:
+      category: security
+      cwe:
+        - "CWE-862: Missing Authorization"
+        - "CWE-269: Improper Privilege Management"
+      owasp:
+        - "A01:2021 - Broken Access Control"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH
+      polarion-rule: true
+      references:
+        - https://github.com/SchweizerischeBundesbahnen/ch.sbb.polarion.extension.generic/pull/402
+        - https://github.com/SchweizerischeBundesbahnen/ch.sbb.polarion.extension.generic/blob/main/app/src/main/java/ch/sbb/polarion/extension/generic/service/PolarionService.java
+        - https://testdrive.polarion.com/polarion/sdk/doc/javadoc-rendering/com/polarion/alm/shared/api/transaction/TransactionalExecutor.html
+        - https://testdrive.polarion.com/polarion/sdk/doc/javadoc/com/polarion/platform/security/ISecurityService.html
+    pattern-either:
+      - patterns:
+          - pattern: |
+              TransactionalExecutor.executeInWriteTransaction($LAMBDA);
+          - pattern-not-regex: '\b(check|has)Permissions?\s*\('
+      - patterns:
+          - pattern: |
+              $EXEC.executeInWriteTransaction($LAMBDA);
+          - pattern-not-regex: '\b(check|has)Permissions?\s*\('

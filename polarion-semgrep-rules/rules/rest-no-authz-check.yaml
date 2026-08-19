@@ -1,0 +1,107 @@
+rules:
+  - id: polarion-rest-no-authz-check
+    languages: [java]
+    severity: WARNING
+    message: |
+      JAX-RS endpoint mutates state without an authorization gate, and the
+      class is not under @Path("/internal/..."). For /api/* endpoints,
+      apply @Secured (the SBB AuthenticationFilter validates Bearer PAT or
+      X-Polarion-REST-Token). For ambiguous paths (no class-level @Path,
+      or a non-/internal/non-/api prefix), confirm the URL space and add
+      whichever gate fits.
+
+      Why /internal/* is excluded: per the generic extension's README
+      ("REST architecture: /internal vs /api"), /internal/* controllers
+      are intentionally NOT @Secured. Authentication is enforced at the
+      servlet container level via <security-constraint role-name="user">
+      with FORM login against PolarionRealm; Polarion's DoAsFilter then
+      establishes the session Subject so platform APIs called from the
+      controller (IDataService, IRepositoryConnection, IPObject mutations)
+      self-check permissions against the real user. CSRF defense is the
+      SameSite=Lax cookie default plus the convention that state-changing
+      methods are POST/PUT/DELETE (not GET). Adding @Secured to /internal/*
+      would break the UI flow, which authenticates via session cookie, not
+      via PAT.
+
+      Caveats this rule cannot detect:
+        - An /api/* wrapper subclass that omits @Secured but inherits
+          methods from an /internal/* parent class. Semgrep is file-scoped;
+          the @POST/@PUT/etc. lives in the parent file under @Path("/internal").
+          Manual review required for any *ApiController that does not
+          declare class-level @Secured.
+        - State-changing @GET on /internal/*. SameSite=Lax permits cookie-
+          bearing cross-origin GET (top-level navigation, <img src=...>),
+          so a side-effecting GET is exploitable. Covered by the companion
+          rule polarion-get-with-write-transaction.
+
+      See <https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/blob/main/polarion-semgrep-rules/README.md>.
+    metadata:
+      category: security
+      cwe:
+        - "CWE-862: Missing Authorization"
+        - "CWE-285: Improper Authorization"
+      owasp:
+        - "A01:2021 - Broken Access Control"
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: HIGH
+      polarion-rule: true
+      references:
+        - https://github.com/SchweizerischeBundesbahnen/ch.sbb.polarion.extension.generic#readme
+        - https://developer.siemens.com/polarion/enable-rest-api.html
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  @POST
+                  $RET $METHOD(...) {
+                    ...
+                  }
+              - pattern: |
+                  @PUT
+                  $RET $METHOD(...) {
+                    ...
+                  }
+              - pattern: |
+                  @PATCH
+                  $RET $METHOD(...) {
+                    ...
+                  }
+              - pattern: |
+                  @DELETE
+                  $RET $METHOD(...) {
+                    ...
+                  }
+          - pattern-not: |
+              @RolesAllowed(...)
+              $RET $METHOD(...) {
+                ...
+              }
+          # @Secured is the SBB framework's NameBinding for AuthenticationFilter.
+          # Method-level placement above the JAX-RS verb annotation:
+          - pattern-not: |
+              @Secured
+              $RET $METHOD(...) {
+                ...
+              }
+          # Class-level @Secured applies to every method in the class.
+          - pattern-not-inside: |
+              @Secured
+              class $CLASS {
+                ...
+              }
+          # /internal/* paths — intentionally not @Secured by design (see message).
+          - pattern-not-inside:
+              patterns:
+                - pattern: |
+                    @Path("$P")
+                    class $CLASS {
+                      ...
+                    }
+                - metavariable-regex:
+                    metavariable: $P
+                    regex: ^/?internal(/.*)?$
+          # Substring check covers both statement form (`x.hasPermission(...);`)
+          # and conditional form (`if (!x.hasPermission(...))`). pattern-not-inside
+          # with a statement-shaped sub-pattern misses the latter.
+          - pattern-not-regex: '\b(check|has)Permissions?\s*\('

@@ -1,0 +1,54 @@
+rules:
+  - id: polarion-velocity-ssti
+    languages: [java]
+    severity: ERROR
+    message: |
+      `VelocityEngine` instantiated without `SecureUberspector`. Apache
+      Velocity's default introspector exposes the full Java reflection API
+      to template authors — `$obj.getClass().forName(...).newInstance()`
+      escapes the sandbox to RCE (CVE-2020-13936 family).
+
+      Polarion exposes Velocity in: LiveReport pages, classic Wiki pages,
+      cover-page templates, and per-extension renderers (e.g. pdf-exporter,
+      docx-exporter).
+
+      Fix:
+
+        Properties props = new Properties();
+        props.setProperty("runtime.introspector.uberspect",
+            "org.apache.velocity.util.introspection.SecureUberspector");
+        VelocityEngine ve = new VelocityEngine(props);
+
+      Always pair with: never pass user-controlled strings as the template
+      argument to `evaluate(...)` — only hardcoded templates from the
+      extension JAR.
+
+      See <https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/blob/main/polarion-semgrep-rules/README.md>.
+    metadata:
+      category: security
+      cwe:
+        - "CWE-1336: Improper Neutralization of Special Elements Used in a Template Engine"
+        - "CWE-94: Improper Control of Generation of Code (Code Injection)"
+      owasp:
+        - "A03:2021 - Injection"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      polarion-rule: true
+      references:
+        - https://www.sentinelone.com/vulnerability-database/cve-2020-13936/
+    pattern-either:
+      - patterns:
+          # Match the enclosing method so a `setProperty(..., "...SecureUberspector")`
+          # call in the same method clears the finding. KNOWN LIMITATION:
+          # if SecureUberspector is referenced via a class-scope constant
+          # outside the method, this rule still fires (FP). Move the
+          # constant inline or use String.intern() in the method to
+          # suppress; alternatively triage as documented FP.
+          - pattern: |
+              $RET $METHOD(...) {
+                ...
+                new VelocityEngine(...);
+                ...
+              }
+          - pattern-not-regex: 'SecureUberspector'

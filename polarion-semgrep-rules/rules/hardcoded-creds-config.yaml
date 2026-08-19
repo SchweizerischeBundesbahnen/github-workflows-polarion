@@ -1,0 +1,49 @@
+rules:
+  - id: polarion-hardcoded-creds-config
+    languages: [generic]
+    severity: ERROR
+    paths:
+      # Restrict to config-file extensions to avoid scanning .java / .py.
+      # File-content patterns below (specific cred-key names) are precise
+      # enough that test fixtures using `password=...` for legitimate test
+      # accounts will rarely trigger.
+      include:
+        - "*.properties"
+        - "*.xml"
+    message: |
+      Polarion configuration file contains a non-placeholder credential.
+      Production deployments source credentials from environment variables,
+      Docker secrets, or Vault. Plaintext credentials in committed config
+      are a leak even if the repo is private (Renovate bots, CI logs,
+      `git log -p`, container layer caches).
+
+      Use one of:
+        - Property placeholder: `db.password=${env.DB_PASSWORD}`
+        - Polarion's encrypted credentials format
+        - Externalized via Docker/K8s secrets mount
+
+      See <https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/blob/main/polarion-semgrep-rules/README.md>.
+    metadata:
+      category: security
+      cwe:
+        - "CWE-798: Use of Hard-coded Credentials"
+        - "CWE-256: Plaintext Storage of a Password"
+      owasp:
+        - "A07:2021 - Identification and Authentication Failures"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      polarion-rule: true
+    pattern-either:
+      # .properties: key=value where value is non-empty AND not a
+      # ${env.X} / ${sys.X} / @PLACEHOLDER@ form.
+      - patterns:
+          - pattern-regex: '(?im)^\s*(db\.password|ldap\.password|admin\.password|api\.?key|api\.?secret|client\.?secret|jdbc\.password|mail\.password)\s*=\s*[^\s$@\n].*$'
+          - pattern-not-regex: '\$\{[^}]+\}'
+          - pattern-not-regex: '@[A-Z_]+@'
+          - pattern-not-regex: '=\s*$'
+      # XML: <password>x</password> with non-placeholder content.
+      - patterns:
+          - pattern-regex: '(?is)<(?:password|secret|apikey|api-key|client-secret)>\s*[^<\s$@][^<]*</(?:password|secret|apikey|api-key|client-secret)>'
+          - pattern-not-regex: '\$\{[^}]+\}'
+          - pattern-not-regex: '@[A-Z_]+@'

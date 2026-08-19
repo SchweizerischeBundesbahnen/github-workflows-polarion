@@ -1,0 +1,134 @@
+---
+name: Polarion Semgrep (reusable)
+on:
+  workflow_call:
+    inputs:
+      rules-ref:
+        description: |
+          Ref of github-workflows-polarion to take the rule pack from. Keep it
+          equal to the ref in the caller's `uses:` line, otherwise the rules and
+          the workflow that runs them can drift apart.
+        required: false
+        type: string
+        default: main
+      semgrep-version:
+        description: |
+          Semgrep version to run. Empty uses the version pinned in
+          polarion-semgrep-rules/SEMGREP_VERSION, which is the version the rule
+          baseline was measured on.
+        required: false
+        type: string
+        default: ""
+      registry-packs:
+        description: |
+          Comma-separated Semgrep registry packs to run alongside the Polarion
+          rules. Empty by default: CodeQL security-extended and SonarCloud
+          already cover generic Java and OWASP on these repositories, so a
+          registry pack here mostly produces duplicate alerts.
+        required: false
+        type: string
+        default: ""
+      scan-path:
+        description: Path within the repository to scan
+        required: false
+        type: string
+        default: "."
+      timeout-minutes:
+        description: Job timeout in minutes
+        required: false
+        type: number
+        default: 10
+permissions: {}
+jobs:
+  semgrep:
+    name: Semgrep (Polarion rules)
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      # Inputs are read through env rather than interpolated into `run:` so a
+      # caller-supplied value cannot be expanded as shell source.
+      RULES_PATH: .polarion-rules
+      SEMGREP_VERSION_INPUT: ${{ inputs.semgrep-version }}
+      REGISTRY_PACKS: ${{ inputs.registry-packs }}
+      SCAN_PATH: ${{ inputs.scan-path }}
+    steps:
+      - name: Checkout repository under test
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Checkout Polarion rule pack
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/github-workflows-polarion
+          ref: ${{ inputs.rules-ref }}
+          path: .polarion-rules
+          sparse-checkout: polarion-semgrep-rules
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        with:
+          enable-cache: true
+      - name: Run Semgrep
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${SEMGREP_VERSION_INPUT}"
+          if [ -z "${version}" ]; then
+            version="$(tr -d '[:space:]' < "${RULES_PATH}/polarion-semgrep-rules/SEMGREP_VERSION")"
+          fi
+
+          configs=(--config "${RULES_PATH}/polarion-semgrep-rules/rules")
+          if [ -n "${REGISTRY_PACKS}" ]; then
+            IFS=',' read -r -a packs <<< "${REGISTRY_PACKS}"
+            for pack in "${packs[@]}"; do
+              if [ -n "${pack}" ]; then
+                configs+=(--config "${pack}")
+              fi
+            done
+          fi
+
+          # The rule pack checkout is excluded explicitly: it carries
+          # deliberately vulnerable test fixtures, which would otherwise be
+          # reported as findings against the repository under test.
+          #
+          # `semgrep scan` exits 0 when findings exist — only `semgrep ci` and
+          # `--error` fail on findings — so a non-zero exit here is a real
+          # error (invalid rule YAML, unknown language, unreadable target).
+          # Fail the step on it instead of masking it with `|| true`, which
+          # would leave the SARIF upload to fail on a missing file.
+          # --no-rewrite-rule-ids keeps the SARIF rule id equal to the id in the
+          # rule file. By default semgrep prefixes it with the config path
+          # (polarion-semgrep-rules.rules.polarion-...), which would change the
+          # identity of every Code Scanning alert if the checkout path ever moved,
+          # resurrecting alerts that had been dismissed.
+          set +e
+          uvx "semgrep==${version}" scan \
+            "${configs[@]}" \
+            --no-rewrite-rule-ids \
+            --sarif --output semgrep.sarif \
+            --metrics off \
+            --exclude "${RULES_PATH}" \
+            --exclude target \
+            --exclude node_modules \
+            --exclude build \
+            "${SCAN_PATH}"
+          rc=$?
+          set -e
+
+          if [ "${rc}" -ne 0 ]; then
+            echo "::error::semgrep exited ${rc}"
+            exit "${rc}"
+          fi
+          if [ ! -s semgrep.sarif ]; then
+            echo "::error::semgrep produced no SARIF output"
+            exit 1
+          fi
+      - name: Upload SARIF to Code Scanning
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd  # v4
+        with:
+          sarif_file: semgrep.sarif
+          category: polarion-semgrep
