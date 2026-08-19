@@ -81,16 +81,26 @@ def parse_settings_allow(settings: object) -> set[str] | None:
     if not text.lstrip().startswith("{"):
         with open(text.strip(), encoding="utf-8") as handle:
             text = handle.read()
-    allow = json.loads(text).get("permissions", {}).get("allow")
-    if allow is not None and not isinstance(allow, list):
-        # set() over a str yields its characters. A non-list allow would become a
-        # set of single letters, none of which start with mcp__, so the
-        # settings-only branch below would find no servers and pass — a silent
-        # pass on exactly the configuration this script exists to catch. Reject
-        # it: permissions.allow is a JSON array, so anything else is malformed
-        # input worth naming rather than coercing.
-        raise TypeError(f"permissions.allow is {type(allow).__name__}, not a list")
-    return None if allow is None else set(allow)
+    document = json.loads(text)
+    permissions = document.get("permissions", {}) if isinstance(document, dict) else None
+    if not isinstance(permissions, dict):
+        # A settings *file* may hold any JSON document, and permissions may be
+        # written as something other than a mapping. .get() on either raises
+        # AttributeError, which no handler here catches, so the run would end on
+        # a traceback naming this line instead of the workflow, job and step.
+        raise TypeError("settings has no permissions mapping")
+    allow = permissions.get("allow")
+    if allow is None:
+        return None
+    # set() over a str yields its characters, and a non-str entry has no
+    # .startswith, so the settings-only branch below would either find no mcp__
+    # server and pass — a silent pass on exactly the configuration this script
+    # exists to catch — or raise AttributeError outside any handler.
+    # permissions.allow is a JSON array of strings; anything else is malformed
+    # input worth naming rather than coercing.
+    if not isinstance(allow, list) or not all(isinstance(t, str) for t in allow):
+        raise TypeError(f"permissions.allow is not a list of strings: {allow!r}")
+    return set(allow)
 
 
 def check_step(path: str, job: str, index: int, step: dict) -> list[str]:
