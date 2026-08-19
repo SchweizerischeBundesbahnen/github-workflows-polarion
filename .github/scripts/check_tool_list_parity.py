@@ -91,6 +91,25 @@ def check_step(path: str, job: str, index: int, step: dict) -> list[str]:
     with_ = step.get("with") or {}
     settings, claude_args = with_.get("settings"), with_.get("claude_args")
 
+    # A ${{ }} expression is resolved by the runner, so its value is not in the
+    # file. Neither list can be read, and reporting the expression text as a
+    # divergence would attach a runtime claim to something never parsed. Say the
+    # step went unchecked instead, on stderr, so the gap stays visible: silently
+    # returning would let an expression remove a step from coverage, which is
+    # the failure this script exists to prevent.
+    unresolved = [
+        name
+        for name, value in (("settings", settings), ("claude_args", claude_args))
+        if isinstance(value, str) and "${{" in value
+    ]
+    if unresolved:
+        print(
+            f"{where}: not checked, {' and '.join(unresolved)} is a GitHub "
+            f"expression resolved at run time",
+            file=sys.stderr,
+        )
+        return []
+
     try:
         from_settings = None if settings is None else parse_settings_allow(settings)
     except (json.JSONDecodeError, OSError, TypeError) as exc:

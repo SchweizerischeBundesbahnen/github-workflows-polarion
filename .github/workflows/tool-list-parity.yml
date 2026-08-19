@@ -24,6 +24,14 @@ jobs:
           python-version: "3.x"
       - run: pip install pyyaml
       # Fails when a tool is declared in settings.permissions.allow but not in
-      # claude_args --allowedTools, or the reverse. Both directions fail
-      # silently at runtime, which is why they are asserted here.
-      - run: python .github/scripts/check_tool_list_parity.py .github/workflows/*.yml
+      # claude_args --allowedTools, or the reverse. The first direction fails
+      # silently at runtime, which is why it is asserted here.
+      #
+      # nullglob so an unmatched *.yaml is dropped rather than passed through as
+      # a literal filename. Both extensions, matching the pre-commit hook's
+      # ^\.github/workflows/.*\.ya?ml$ — CI is the binding gate, so it must not
+      # check less than the advisory hook does.
+      - run: |
+          shopt -s nullglob
+          workflows=(.github/workflows/*.yml .github/workflows/*.yaml)
+          python .github/scripts/check_tool_list_parity.py "${workflows[@]}"
