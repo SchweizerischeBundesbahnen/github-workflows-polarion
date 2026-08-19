@@ -37,3 +37,10 @@ dependencies = [
 [tool.poetry.dependencies]
 # ruleid: polarion-weasyprint-pre-68
 weasyprint = "^67.0"
+
+# Inline-table form, which a dependency carrying extras or markers requires. In
+# its own table because TOML forbids redefining a key, which `check-toml` in this
+# repository's pre-commit enforces.
+[tool.poetry.group.doc.dependencies]
+# ruleid: polarion-weasyprint-pre-68
+weasyprint = {version = "==67.0", extras = ["doc"]}

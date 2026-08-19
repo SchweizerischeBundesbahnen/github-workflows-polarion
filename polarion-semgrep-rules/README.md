@@ -119,13 +119,18 @@ repeated in the header of the rule it applies to.
   `FEATURE_SECURE_PROCESSING`: OWASP records that it "may not always mitigate
   entity expansion" and treats it as supplementary. Both negative cases are
   pinned in the vulnerable fixture.
-- **`polarion-weasyprint-pre-68` cannot match `poetry.lock`.** A lock file
-  splits the name and the version across two lines (`name = "weasyprint"` then
-  `version = "67.0"`), which no single-line pattern can join. `*poetry.lock`
-  stays in `paths.include` so a future cross-line alternative needs no change
-  there, but today the entry scans nothing. `*.toml`, `*.txt` and `*Pipfile*`
-  are covered, including the assignment form both Pipfile and the poetry
-  dependency table use.
+- **`polarion-weasyprint-pre-68` cannot match a specifier split across
+  lines.** Two forms are out of reach, both because TOML spreads them over more
+  than one line and every alternative is single-line: a `poetry.lock` entry
+  (`name = "weasyprint"` then `version = "67.0"`), and the dotted-section form
+  (`[tool.poetry.dependencies.weasyprint]` then `version = "^67.0"`).
+  `*poetry.lock` stays in `paths.include` so a future cross-line alternative
+  needs no change there, but today that entry scans nothing.
+
+  What is covered: the specifier string (`weasyprint==67`, `>=66,<68`, any
+  casing), the assignment form (`weasyprint = "==67.0"`) and the inline-table
+  form (`weasyprint = {version = "^67.0", extras = [...]}`) — the last two being
+  the syntaxes Pipfile and the poetry dependency table use.
 - **The `ACCESS_EXTERNAL_DTD` form clears DOM only, not SAX.**
   `SAXParserFactory` has no `setAttribute`, so the SAX route to that hardening is
   `parser.setProperty(...)` after `newSAXParser()`, which falls outside the

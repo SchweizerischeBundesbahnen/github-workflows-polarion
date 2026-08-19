@@ -65,3 +65,10 @@ rules:
       # declared in paths.include while being unmatchable.
       - pattern-regex: '(?i)weasyprint\s*=\s*"[^"\n]*(?:==|<=|\^|~=)\s*(?:6[0-7]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
       - pattern-regex: '(?i)weasyprint\s*=\s*"[^"\n]*<\s*(?:6[0-8]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
+      # Inline-table form: `weasyprint = {version = "==67.0", extras = [...]}`.
+      # Documented Pipfile syntax, and the form poetry requires as soon as a
+      # dependency carries extras, markers, optional or source — so the plain
+      # string alternatives above cannot be assumed. TOML confines an inline
+      # table to one line, so `[^}\n]*` cannot leave it or reach another package.
+      - pattern-regex: '(?i)weasyprint\s*=\s*\{[^}\n]*version\s*=\s*"[^"\n]*(?:==|<=|\^|~=)\s*(?:6[0-7]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
+      - pattern-regex: '(?i)weasyprint\s*=\s*\{[^}\n]*version\s*=\s*"[^"\n]*<\s*(?:6[0-8]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
