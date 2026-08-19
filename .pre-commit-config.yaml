@@ -36,3 +36,11 @@ repos:
     rev: v1.7.12
     hooks:
       - id: actionlint
+  - repo: local
+    hooks:
+      - id: claude-tool-list-parity
+        name: Assert claude-code-action tool lists agree
+        entry: .github/scripts/check_tool_list_parity.py
+        language: python
+        additional_dependencies: [pyyaml]
+        files: ^\.github/workflows/.*\.ya?ml$

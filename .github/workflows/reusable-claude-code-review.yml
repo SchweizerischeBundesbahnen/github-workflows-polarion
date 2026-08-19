@@ -440,9 +440,12 @@ jobs:
           # be called, never whether its server is started, so declaring it there left
           # every review without inline comments.
           # INVARIANT: this list and settings.permissions.allow above must stay
-          # identical. A tool in settings only is permitted but its server never
-          # starts; a tool here only starts its server but the call is denied.
-          # Both failures are silent — that split is the bug this comment exists for.
+          # identical, asserted by .github/scripts/check_tool_list_parity.py. A tool
+          # in settings only is permitted but its server never starts, silently —
+          # that is the bug this comment exists for. The reverse is not symmetrical:
+          # parse-sdk-options.ts passes this list to the SDK as allowedTools, its
+          # permission allowlist, so a tool here only is both started and permitted.
+          # They are kept identical so a reader can tell which list is authoritative.
           claude_args: >-
             --max-turns 40 --model opus --effort high
             --allowedTools "Read,Grep,Glob,BatchTool,mcp__github_inline_comment__create_inline_comment,Bash(gh pr review:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*)"
