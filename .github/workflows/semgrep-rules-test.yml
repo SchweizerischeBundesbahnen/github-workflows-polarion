@@ -1,0 +1,34 @@
+---
+name: Semgrep rules self-test
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - polarion-semgrep-rules/**
+      - .github/workflows/semgrep-rules-test.yml
+  workflow_dispatch:
+permissions: {}
+jobs:
+  test-rules:
+    name: Assert each rule fires on its vulnerable fixture only
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        with:
+          enable-cache: true
+      # The pinned version is the one the rule baseline was measured on. A rule
+      # that only passes on a different semgrep version is a rule whose
+      # behaviour nobody has measured.
+      - name: Run rule self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < polarion-semgrep-rules/SEMGREP_VERSION)"
+          SEMGREP="uvx semgrep==${version}" \
+            bash polarion-semgrep-rules/tests/test_rules.sh

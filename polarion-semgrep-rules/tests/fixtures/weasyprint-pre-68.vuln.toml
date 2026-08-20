@@ -1,0 +1,46 @@
+# Deliberately broken: WeasyPrint 67.0 is vulnerable to CVE-2025-68616
+# (SSRF protection bypass via HTTP redirect, CVSS 7.5 High, CWE-918/601).
+# Patch shipped in WeasyPrint 68.0.
+# tests/test_rules.sh asserts one finding per `ruleid:` annotation below, each
+# identifying CVE-2025-68616.
+
+[project]
+name = "weasyprint-service-broken"
+version = "0.0.0"
+requires-python = ">=3.14,<3.15"
+
+dependencies = [
+    # ruleid: polarion-weasyprint-pre-68
+    "weasyprint==67.0",
+    # Canonical PyPI spelling. Requirement names are case-insensitive per
+    # PEP 503, and `pip freeze` emits this form, so a case-sensitive rule
+    # turned itself off silently.
+    # ruleid: polarion-weasyprint-pre-68
+    "WeasyPrint==66.0",
+    # Bare-integer release, the spelling WeasyPrint used for 43-52. PEP 440
+    # selects the same release as `==51.0`.
+    # ruleid: polarion-weasyprint-pre-68
+    "weasyprint==51",
+    # Compound specifier: the cap is not adjacent to the name, and this
+    # resolves to 67.x.
+    # ruleid: polarion-weasyprint-pre-68
+    "weasyprint>=66,<68",
+    "defusedxml==0.7.1",
+    "fastapi==0.136.1",
+    "uvicorn==0.46.0",
+]
+
+# Assignment form: the whole specifier is its own quoted string. This is the only
+# dependency syntax a Pipfile has, and the poetry table shares it, so the same
+# alternative covers both — the self-test pairs one fixture per rule by name, so
+# a separate Pipfile fixture would need a harness change.
+[tool.poetry.dependencies]
+# ruleid: polarion-weasyprint-pre-68
+weasyprint = "^67.0"
+
+# Inline-table form, which a dependency carrying extras or markers requires. In
+# its own table because TOML forbids redefining a key, which `check-toml` in this
+# repository's pre-commit enforces.
+[tool.poetry.group.doc.dependencies]
+# ruleid: polarion-weasyprint-pre-68
+weasyprint = {version = "==67.0", extras = ["doc"]}

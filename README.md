@@ -4,7 +4,7 @@
 
 Reusable GitHub Actions workflows for the SBB Polarion team.
 
-This repository contains **GitHub Actions workflows (reusable and caller/CI)**. It does not contain application code, libraries, or standalone tools. Other repositories in the organization call the reusable workflows via `workflow_call`.
+This repository contains **GitHub Actions workflows (reusable and caller/CI)** and the Polarion Semgrep rule pack that one of them runs. It does not contain application code or libraries. Other repositories in the organization call the reusable workflows via `workflow_call`.
 
 ## Overview
 
@@ -25,6 +25,8 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)**. 
 | `reusable-openapi-validation.yml` | OpenAPI spec validation using Redocly CLI |
 | `reusable-release-please.yml` | Automated releases and changelogs using release-please (Maven, Python, Docker, etc.) |
 | `reusable-release-please-guard.yml` | Blocks PR merges when the base branch `pom.xml` version is not a SNAPSHOT (prevents post-release drift) |
+| `reusable-codeql-java.yml` | CodeQL analysis for Java repositories, using `build-mode: manual` |
+| `reusable-polarion-semgrep.yml` | Polarion-specific Semgrep rules, uploaded to Code Scanning ([rule pack](polarion-semgrep-rules/README.md)) |
 
 ## Usage
 

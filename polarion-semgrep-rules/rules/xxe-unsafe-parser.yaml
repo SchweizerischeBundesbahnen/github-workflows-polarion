@@ -1,0 +1,73 @@
+rules:
+  - id: polarion-xxe-unsafe-parser
+    languages: [java]
+    severity: ERROR
+    message: |
+      XML parser instantiated without XXE protection. Polarion extensions
+      that parse user-supplied XML (settings imports, FOP/iText input,
+      JAX-RS payloads) are reachable by any authenticated user; an
+      attacker can submit a DOCTYPE with `&xxe;` references that the
+      parser dereferences server-side, leaking files or making outbound
+      requests from the Polarion host.
+
+      Set the relevant feature/property before parsing:
+
+        // DocumentBuilderFactory
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        // SAXParserFactory
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        // XMLInputFactory (StAX)
+        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+
+      OR delegate parsing to a hardened helper class.
+
+      See <https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/blob/main/polarion-semgrep-rules/README.md>.
+    metadata:
+      category: security
+      cwe:
+        - "CWE-611: Improper Restriction of XML External Entity Reference"
+        - "CWE-776: Improper Restriction of Recursive Entity References"
+      owasp:
+        - "A05:2021 - Security Misconfiguration"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      polarion-rule: true
+      references:
+        - https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  $FACTORY = DocumentBuilderFactory.newInstance();
+                  ...
+                  $FACTORY.newDocumentBuilder();
+              - pattern: |
+                  $FACTORY = SAXParserFactory.newInstance();
+                  ...
+                  $FACTORY.newSAXParser();
+          # ACCESS_EXTERNAL_DTD set to "" is the alternative OWASP documents
+          # where DOCTYPE cannot be disabled, so it clears the rule. The empty
+          # value is part of the pattern: `ACCESS_EXTERNAL_DTD, "file"` still
+          # resolves file:// external entities, so matching the constant name
+          # alone would clear the rule on code that is still exposed.
+          # ACCESS_EXTERNAL_SCHEMA is not accepted on its own — restricting
+          # schema resolution does nothing about DOCTYPE processing or external
+          # general entities. FEATURE_SECURE_PROCESSING is not accepted either:
+          # OWASP records that it "may not always mitigate entity expansion"
+          # and treats it as supplementary.
+          #
+          # KNOWN LIMITATION: this clause can only clear the DocumentBuilder
+          # branch. SAXParserFactory has no setAttribute, so the SAX route to
+          # ACCESS_EXTERNAL_DTD is parser.setProperty(...) AFTER newSAXParser(),
+          # which falls outside the matched region — hardened SAX code of that
+          # shape is a false positive. disallow-doctype-decl is unaffected,
+          # because factory.setFeature(...) precedes newSAXParser().
+          - pattern-not-regex: 'disallow-doctype-decl|ACCESS_EXTERNAL_DTD[^,)]*,\s*""'
+      - patterns:
+          - pattern: |
+              $FACTORY = XMLInputFactory.newInstance();
+              ...
+              $FACTORY.createXMLStreamReader(...);
+          - pattern-not-regex: 'IS_SUPPORTING_EXTERNAL_ENTITIES|SUPPORT_DTD'

@@ -1,0 +1,74 @@
+rules:
+  - id: polarion-weasyprint-pre-68
+    languages: [generic]
+    severity: ERROR
+    paths:
+      include:
+        - "*.toml"
+        - "*.txt"
+        - "*Pipfile*"
+        - "*poetry.lock"
+    message: |
+      WeasyPrint pinned at a version < 68.0. CVE-2025-68616 (CVSS 7.5 High,
+      CWE-918) — SSRF protection bypass via HTTP redirect. WeasyPrint's
+      `url_fetcher` validates the requested URL but the underlying urllib
+      follows redirects automatically *without* re-validating the
+      destination, letting an attacker bypass any allowlist by hosting a
+      302 to an internal address.
+
+      Concretely for SBB Polarion's weasyprint-service sidecar (the only
+      consumer in our threat model): a malicious user submits HTML
+      containing `<img src="https://attacker.example/redirect">`, the
+      sidecar's `url_fetcher` accepts the external URL, then urllib follows
+      the 302 to `http://169.254.169.254/...` (cloud metadata) or any
+      internal admin endpoint inside the SBB network — pivoting the
+      sidecar into the perimeter.
+
+      Patched in WeasyPrint 68.0. Bump to ≥ 68.0.
+
+      See <https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/blob/main/polarion-semgrep-rules/README.md>.
+    metadata:
+      category: security
+      cwe:
+        - "CWE-918: Server-Side Request Forgery (SSRF)"
+        - "CWE-601: URL Redirection to Untrusted Site"
+      owasp:
+        - "A10:2021 - Server-Side Request Forgery"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      polarion-rule: true
+      references:
+        - https://github.com/advisories/GHSA-983w-rhvv-gwmv
+        - https://github.com/SchweizerischeBundesbahnen/weasyprint-service
+    pattern-either:
+      # pyproject.toml: dependencies = [..., "weasyprint==X" or "weasyprint<Y" ...]
+      # `\b(?:\.[0-9]+)*` rather than a mandatory `\.[0-9]+`: PEP 440 treats
+      # `==67` and `==67.0` as the same release, and WeasyPrint shipped 43-52 as
+      # bare integers — the oldest and most exposed versions the rule exists to
+      # catch. `\b` keeps 68, 69 and 600 out.
+      - pattern-regex: '(?i)weasyprint\s*==\s*(?:6[0-7]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
+      # `[^"\n]*` rather than `\s*` before the operator: `>=66,<68` is the
+      # ordinary way to cap below a bad release and resolves to 67.x, which
+      # `weasyprint\s*<` cannot see. The class stays inside one quoted specifier
+      # in pyproject.toml and inside one line in requirements.txt, so it cannot
+      # reach a neighbouring dependency. `6[0-8]` on the `<` branch keeps `<68`
+      # while leaving `<69` alone, since `<69` installs the patched 68.x.
+      - pattern-regex: '(?i)weasyprint[^"''\n]*<\s*(?:6[0-8]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
+      - pattern-regex: '(?i)weasyprint[^"''\n]*<=\s*(?:6[0-7]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
+      # requirements.txt-ish: weasyprint==NN.M with no extras
+      - pattern-regex: '(?im)^\s*weasyprint\s*==\s*(?:6[0-7]|[0-5][0-9]?)\b(?:\.[0-9]+)*\s*$'
+      # Pipfile has exactly one dependency syntax, and the poetry table in
+      # pyproject.toml shares it: the whole specifier sits in its own quoted
+      # string — `weasyprint = "==67.0"`, `= "^67"`, `= ">=66,<68"`. No
+      # alternative above can reach across the opening quote, so both were
+      # declared in paths.include while being unmatchable.
+      - pattern-regex: '(?i)weasyprint\s*=\s*"[^"\n]*(?:==|<=|\^|~=)\s*(?:6[0-7]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
+      - pattern-regex: '(?i)weasyprint\s*=\s*"[^"\n]*<\s*(?:6[0-8]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
+      # Inline-table form: `weasyprint = {version = "==67.0", extras = [...]}`.
+      # Documented Pipfile syntax, and the form poetry requires as soon as a
+      # dependency carries extras, markers, optional or source — so the plain
+      # string alternatives above cannot be assumed. TOML confines an inline
+      # table to one line, so `[^}\n]*` cannot leave it or reach another package.
+      - pattern-regex: '(?i)weasyprint\s*=\s*\{[^}\n]*version\s*=\s*"[^"\n]*(?:==|<=|\^|~=)\s*(?:6[0-7]|[0-5][0-9]?)\b(?:\.[0-9]+)*'
+      - pattern-regex: '(?i)weasyprint\s*=\s*\{[^}\n]*version\s*=\s*"[^"\n]*<\s*(?:6[0-8]|[0-5][0-9]?)\b(?:\.[0-9]+)*'

@@ -1,0 +1,72 @@
+rules:
+  - id: polarion-workflow-function-no-authz
+    languages: [java]
+    severity: WARNING
+    message: |
+      Polarion workflow function `execute(...)` does not consult the invoking
+      user identity (`actionContext.getCurrentUser()`) and does not call a
+      permission check.
+
+      The precisely-typed `execute(IArguments, IActionContext)` signature is
+      matched whether or not the body mutates anything, deliberately: the
+      signature is strong evidence of a workflow function, and a read-only body
+      today is one edit away from a mutating one. So this finding is raised for
+      human review rather than as a definite defect — a genuinely read-only
+      function is a valid dismissal.
+
+      Workflow functions run with elevated authority — the workflow engine
+      invokes them as the system user. If the function mutates `IPObject`
+      state based on `IArguments` (config from `workflow.xml`) without
+      verifying the human user who triggered the transition is authorized
+      for that mutation, a low-privilege user can effectively borrow the
+      workflow's elevated permissions by triggering the right transition.
+
+      Fix:
+        - Read the invoking user via `actionContext.getCurrentUser()`
+          (or the equivalent for `IFunction<T>` implementations)
+        - Call `securityService.checkPermission(currentUser, ...)` before
+          any `setValue` / `save` / `setContent` / `delete` invocation
+        - OR explicitly document the workflow as system-elevated and
+          ensure the workflow.xml restricts who can invoke the transition
+
+      Threat: workflow elevation. Confidence: MEDIUM (this rule cannot
+      tell whether the workflow.xml restricts the transition; surfaces
+      for human review).
+    metadata:
+      category: security
+      cwe:
+        - "CWE-269: Improper Privilege Management"
+        - "CWE-285: Improper Authorization"
+      owasp:
+        - "A01:2021 - Broken Access Control"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      polarion-rule: true
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  public $RET execute(IArguments $A, IActionContext $C) {
+                    ...
+                  }
+              - pattern: |
+                  public $RET execute($T1 $A, $T2 $C) {
+                    ...
+                    $X.setValue(...);
+                    ...
+                  }
+              - pattern: |
+                  public $RET execute($T1 $A, $T2 $C) {
+                    ...
+                    $X.save(...);
+                    ...
+                  }
+              - pattern: |
+                  public $RET execute($T1 $A, $T2 $C) {
+                    ...
+                    $X.delete(...);
+                    ...
+                  }
+          - pattern-not-regex: '\b(check|has)Permissions?\s*\('
+          - pattern-not-regex: 'getCurrentUser\s*\('

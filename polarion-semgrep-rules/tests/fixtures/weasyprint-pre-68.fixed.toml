@@ -1,0 +1,15 @@
+# Snapshot of SchweizerischeBundesbahnen/weasyprint-service pyproject.toml
+# at 2026-05-05. WeasyPrint 68.1 is past the CVE-2025-68616 patch (68.0).
+# Skill must produce ZERO findings against this file.
+
+[project]
+name = "weasyprint-service"
+version = "0.0.0"
+requires-python = ">=3.14,<3.15"
+
+dependencies = [
+    "weasyprint==68.1",
+    "defusedxml==0.7.1",
+    "fastapi==0.136.1",
+    "uvicorn==0.46.0",
+]
