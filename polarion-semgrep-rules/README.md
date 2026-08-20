@@ -27,6 +27,8 @@ SEMGREP="uvx semgrep==$(cat polarion-semgrep-rules/SEMGREP_VERSION)" \
   bash polarion-semgrep-rules/tests/test_rules.sh
 ```
 
+Re-measure the corpus with `POLARION_TARGETS_DIR=<dir> bash polarion-semgrep-rules/tests/measure_corpus.sh`, which needs local clones and so cannot run in CI.
+
 `jq` is required. A rule missing either fixture fails the suite rather than
 being skipped, and the number of rules tested is asserted against the number of
 rule files, so a suite that checked nothing cannot report success. The
