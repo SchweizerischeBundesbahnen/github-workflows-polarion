@@ -20,7 +20,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)** a
 - Reusable workflows accept secrets via `workflow_call` — never hardcode secrets or tokens
 - Use `${{ github.repository_owner }}` instead of hardcoding the org name to keep workflows portable
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
-- `polarion-semgrep-rules/tests/fixtures/` holds deliberately vulnerable Java and configuration files. A workflow that scans a consumer repository must exclude the rule pack checkout path, or the fixtures are reported as findings against that repository
+- `polarion-semgrep-rules/tests/fixtures/` holds deliberately vulnerable Java and configuration files, and a workflow that scans a consumer repository must exclude the rule pack checkout path. Semgrep's built-in `.semgrepignore` already skips `tests/`, so the exclusion looks redundant and is not: a consumer repository that ships its own `.semgrepignore` REPLACES the built-in list rather than adding to it, and the fixtures then land on that repository — measured 2026-08-19 at 42 findings against a consumer whose `.semgrepignore` contained only `node_modules/`, versus 0 with `--exclude`. The same built-in list is why the rule baseline covers `src/main` only: `src/test/java` matches `test/` and is never scanned
 - Verify a rule-pack change with `SEMGREP="uvx semgrep==$(cat polarion-semgrep-rules/SEMGREP_VERSION)" bash polarion-semgrep-rules/tests/test_rules.sh` — without the `SEMGREP` override the suite runs whatever semgrep is on PATH, which is not the version the rule baseline was measured on
 
 ## Workflow Naming

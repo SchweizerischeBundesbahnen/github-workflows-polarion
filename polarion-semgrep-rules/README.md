@@ -148,6 +148,19 @@ repeated in the header of the rule it applies to.
   for human review rather than as a definite defect, and a genuinely read-only
   function is a valid dismissal.
 
+## What semgrep skips before a rule runs
+
+Semgrep applies a built-in `.semgrepignore` whose "common test paths" section covers `test/` and
+`tests/`. Two consequences, both measured on 2026-08-19 with semgrep 1.172.0:
+
+- **The baseline covers `src/main` only.** A consumer's `src/test/java` matches `test/` and is
+  never scanned, so no finding in this pack's corpus numbers comes from test code.
+- **A consumer's own `.semgrepignore` replaces that list rather than extending it.** Against a
+  repository whose `.semgrepignore` held only `node_modules/`, the rule pack checkout produced
+  **42 findings from these fixtures**, and 0 with the `--exclude` the reusable workflow passes. So
+  that exclusion is load-bearing for exactly the consumers whose ignore file looks harmless, and
+  it is not made redundant by the fixtures living under `tests/`.
+
 ## Consuming the pack from CI
 
 `.github/workflows/reusable-polarion-semgrep.yml` in this repository checks the
