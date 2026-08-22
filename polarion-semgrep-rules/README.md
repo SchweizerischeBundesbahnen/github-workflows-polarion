@@ -165,8 +165,10 @@ repeated in the header of the rule it applies to.
   method is fine — the statement ellipsis descends into a `try`, `if` or loop
   body, which matters because the OWASP cheat sheet's own DOM example wraps
   `setFeature` in `try`/`catch`; both depths are pinned in the fixed fixture. A
-  nested method BODY is not: hardening performed inside an anonymous class or a
-  lambda within the method still reports. That descent is unconditional, which
+  it descends into a lambda body as well. What it does not descend into is an
+  anonymous class's method body, so hardening performed there still reports —
+  the one shape of the three that is a false positive. That descent is
+  unconditional, which
   cuts the other way too: hardening behind an `if` clears the rule even though
   the branch not taken reaches the parser unhardened. Semgrep matches statements,
   not paths, so this is a limitation of the analysis rather than of these

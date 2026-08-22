@@ -120,4 +120,22 @@ public class XxeFixed {
         DocumentBuilder builder = factory.newDocumentBuilder();
         return builder.parse(new InputSource(new StringReader(xml)));
     }
+
+    // ok: polarion-xxe-unsafe-parser — hardening inside a lambda body, which the
+    // statement ellipsis descends into. An anonymous class's method body is the
+    // boundary it does not cross; that shape is a documented false positive and
+    // has no annotation here, because a `ruleid:` would assert it as correct.
+    public Document parseDocHardenedInLambda(String xml) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        Runnable harden = () -> {
+            try {
+                factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            } catch (ParserConfigurationException e) {
+                // a real caller logs this
+            }
+        };
+        harden.run();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        return builder.parse(new InputSource(new StringReader(xml)));
+    }
 }
