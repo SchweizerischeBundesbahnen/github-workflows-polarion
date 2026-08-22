@@ -87,4 +87,17 @@ public class XxeVulnerable {
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         return builder.parse(new InputSource(new StringReader(xml)));
     }
+
+    // The StAX properties are typed Boolean; a string value is coerced by some
+    // implementations only, so it is not accepted as proof of hardening — the
+    // same reason ACCESS_EXTERNAL_DTD set to "file" does not clear the rule.
+    // ruleid: polarion-xxe-unsafe-parser
+    public void parseStaxStringFalse(String xml) throws Exception {
+        XMLInputFactory factory = XMLInputFactory.newInstance();
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, "false");
+        XMLStreamReader reader = factory.createXMLStreamReader(new StringReader(xml));
+        while (reader.hasNext()) {
+            reader.next();
+        }
+    }
 }

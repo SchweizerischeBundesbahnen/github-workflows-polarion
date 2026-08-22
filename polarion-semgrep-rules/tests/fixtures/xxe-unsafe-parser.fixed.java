@@ -6,6 +6,7 @@ import static javax.xml.XMLConstants.ACCESS_EXTERNAL_SCHEMA;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import javax.xml.stream.XMLInputFactory;
@@ -74,5 +75,31 @@ public class XxeFixed {
         factory.setAttribute(ACCESS_EXTERNAL_SCHEMA, "");
         DocumentBuilder builder = factory.newDocumentBuilder();
         return builder.parse(new InputSource(new StringReader(xml)));
+    }
+
+    // ok: polarion-xxe-unsafe-parser — hardening wrapped in try/catch, which is
+    // the shape the OWASP cheat sheet uses because setFeature is checked. The
+    // statement ellipsis descends into the block, so nesting does not matter.
+    public Document parseDocHardenedInTryBlock(String xml) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        try {
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        } catch (ParserConfigurationException e) {
+            // a real caller logs this
+        }
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        return builder.parse(new InputSource(new StringReader(xml)));
+    }
+
+    // ok: polarion-xxe-unsafe-parser — the boxed spelling of false, which
+    // setProperty accepts because its value parameter is an Object
+    public void parseStaxBoxedFalse(String xml) throws Exception {
+        XMLInputFactory factory = XMLInputFactory.newInstance();
+        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
+        XMLStreamReader reader = factory.createXMLStreamReader(new StringReader(xml));
+        while (reader.hasNext()) {
+            reader.next();
+        }
     }
 }

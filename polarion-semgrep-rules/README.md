@@ -120,8 +120,14 @@ repeated in the header of the rule it applies to.
   `SecureUberspector.class`. Both spellings are accepted from a method, a
   constructor and a static initializer alike, and `class $CLASS { ... }` matches
   an `enum` declaration, so an enum singleton holding an engine is covered.
-  Hardening expressed any other way, or placed outside the class, still produces
-  a false positive.
+  Hardening expressed any other way is a false positive, and so is hardening
+  placed outside the scope the branch applies to — which for a method-local
+  construction means anywhere but that method. `new
+  VelocityEngine(secureProperties())` in a builder method is therefore reported
+  although the helper hardens, while the identical delegation in a field
+  initializer is cleared by the class-scoped branch. That is the price of not
+  letting a hardened method clear an unhardened sibling, and it predates this
+  wording rather than being introduced by it.
 - **`polarion-xxe-unsafe-parser` accepts exactly two hardening forms, on the
   receiver the finding is about.** `disallow-doctype-decl`, and
   `ACCESS_EXTERNAL_DTD` set to an empty string — on the factory through
@@ -144,7 +150,14 @@ repeated in the header of the rule it applies to.
   `FEATURE_SECURE_PROCESSING`: OWASP records that it "may not always mitigate
   entity expansion" and treats it as supplementary. Both negative cases are
   pinned in the vulnerable fixture, as are the sibling-factory and
-  hardened-too-late shapes. The limitation is the scope: every clause requires
+  hardened-too-late shapes. On the StAX branch the boxed `Boolean.FALSE` is
+  accepted alongside the literal `false`, because `setProperty` takes an
+  `Object`; the string `"false"` is not, since the specification types these
+  properties as Boolean and a value only some implementations coerce is not proof
+  of hardening. Rejected earlier and worth not retrying: widening the SAX
+  positive pattern past the factory call, which makes the region overlap itself
+  and produces duplicate findings on unhardened code without clearing the
+  hardened one — the parser-level clause exists because of that. The limitation is the scope: every clause requires
   the configuring call in the same statement sequence, so hardening delegated to
   a helper method or performed in a constructor does not clear the rule.
 - **Both rules above match the configuring call structurally, not as text.** A
@@ -170,14 +183,6 @@ repeated in the header of the rule it applies to.
   casing), the assignment form (`weasyprint = "==67.0"`) and the inline-table
   form (`weasyprint = {version = "^67.0", extras = [...]}`) — the last two being
   the syntaxes Pipfile and the poetry dependency table use.
-- **The `ACCESS_EXTERNAL_DTD` form clears DOM only, not SAX.**
-  `SAXParserFactory` has no `setAttribute`, so the SAX route to that hardening is
-  `parser.setProperty(...)` after `newSAXParser()`, which falls outside the
-  matched region — SAX code hardened that way is reported at ERROR. Widening the
-  SAX pattern past the factory call was tried and made it worse: the region
-  overlaps itself, producing duplicate findings on unhardened code without
-  clearing the hardened case. `disallow-doctype-decl` is unaffected on both
-  branches, because `factory.setFeature(...)` precedes `newSAXParser()`.
 - **`polarion-workflow-function-no-authz` cannot read `workflow.xml`, and does
   not require a mutation.** Whether the transition itself is role-restricted is
   outside the rule's reach. The precisely-typed

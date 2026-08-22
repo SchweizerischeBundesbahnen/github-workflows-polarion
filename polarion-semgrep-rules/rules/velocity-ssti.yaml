@@ -50,7 +50,11 @@ rules:
       #
       # A — construction inside a method body. The suppression is scoped to that
       # same method, so a sibling method that hardens its own engine does not
-      # clear this one.
+      # clear this one. KNOWN LIMITATION, and the cost of that scoping: only
+      # hardening in the SAME method clears a method-local construction, so
+      # `new VelocityEngine(secureProperties())` in a builder method is reported
+      # although the helper hardens. The identical delegation in a field
+      # initializer is cleared, because that takes the class-scoped branch B.
       - patterns:
           - pattern: new VelocityEngine(...)
           - pattern-inside: |

@@ -125,6 +125,16 @@ rules:
               $FACTORY.createXMLStreamReader(...);
           # Either property alone clears the StAX branch, and the value is part
           # of the pattern for the same reason it is above.
+          #
+          # XMLInputFactory.setProperty takes an Object, so the boxed spelling is
+          # ordinary here and is accepted alongside the literal: semgrep does not
+          # resolve a JDK field like Boolean.FALSE to a literal the way it
+          # resolves a `static final String` declared in the file, so each
+          # spelling needs its own clause. KNOWN LIMITATION: the STRING "false"
+          # is deliberately NOT accepted. Some implementations coerce it, the
+          # StAX specification types these properties as Boolean, and a value
+          # that only some parsers honour is not proof of hardening — the same
+          # reason `ACCESS_EXTERNAL_DTD, "file"` does not clear the rule.
           - pattern-not: |
               $FACTORY = XMLInputFactory.newInstance();
               ...
@@ -134,6 +144,18 @@ rules:
           - pattern-not: |
               $FACTORY = XMLInputFactory.newInstance();
               ...
+              $FACTORY.setProperty($QUALIFIER.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
+              ...
+              $FACTORY.createXMLStreamReader(...);
+          - pattern-not: |
+              $FACTORY = XMLInputFactory.newInstance();
+              ...
               $FACTORY.setProperty($QUALIFIER.SUPPORT_DTD, false);
+              ...
+              $FACTORY.createXMLStreamReader(...);
+          - pattern-not: |
+              $FACTORY = XMLInputFactory.newInstance();
+              ...
+              $FACTORY.setProperty($QUALIFIER.SUPPORT_DTD, Boolean.FALSE);
               ...
               $FACTORY.createXMLStreamReader(...);
