@@ -1,0 +1,10 @@
+---
+paths:
+  .github/workflows/reusable-polarion-semgrep.yml:
+    ignore:
+      # actionlint does not yet model the `job.workflow_*` context properties
+      # (rhysd/actionlint#647, with #696 and #707 open). They are documented and
+      # available on github.com, and the rule-pack checkout uses them to pin the
+      # pack to this workflow's own commit instead of a caller-supplied ref.
+      # Remove this filter once actionlint ships the properties.
+      - 'property "workflow_(repository|sha)" is not defined in object type'

@@ -169,6 +169,12 @@ Semgrep applies a built-in `.semgrepignore` whose "common test paths" section co
 pack out alongside the target repository, runs it, and uploads SARIF to Code
 Scanning. Consumers call the reusable workflow rather than vendoring the rules.
 
+The pack is checked out from the workflow's own commit (`job.workflow_repository`
+and `job.workflow_sha`), so the ref in the caller's `uses:` line decides the rule
+version as well and the two cannot drift apart. There is no input for it: a
+caller-supplied ref would both allow that drift and let a caller aim the checkout
+at an arbitrary ref.
+
 ## Where rules are developed
 
 Rules are authored and tuned against real repositories outside CI, where the
