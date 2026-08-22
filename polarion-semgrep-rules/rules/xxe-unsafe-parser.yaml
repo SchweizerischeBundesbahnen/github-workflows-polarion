@@ -105,7 +105,11 @@ rules:
           # it is necessarily reached AFTER newSAXParser() on a different object
           # — hence a method-scoped clause here rather than a `pattern-not`. The
           # receiver is still bound: $PARSER is the object newSAXParser()
-          # returned, and $FACTORY unifies with the positive pattern.
+          # returned, and $FACTORY unifies with the positive pattern. KNOWN
+          # LIMITATION, and the one place the rule is deliberately order-free:
+          # this clause is ordered against the creation call only, so a
+          # setProperty after the parse call — equally useless — is not reported.
+          # The positive pattern ends at newSAXParser() rather than at the parse.
           - pattern-not-inside: |
               $RET $METHOD(...) {
                 ...

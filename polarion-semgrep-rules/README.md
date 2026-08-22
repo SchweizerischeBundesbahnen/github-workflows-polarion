@@ -123,13 +123,19 @@ repeated in the header of the rule it applies to.
   Hardening expressed any other way, or placed outside the class, still produces
   a false positive.
 - **`polarion-xxe-unsafe-parser` accepts exactly two hardening forms, on the
-  receiver the finding is about and before the parser is created.**
-  `disallow-doctype-decl`, and `ACCESS_EXTERNAL_DTD` set to an empty string — on
-  the factory through `setAttribute`, or on the parser through `setProperty`,
-  which is the only SAX route to that property because `SAXParserFactory` has
-  neither method. Hardening a sibling factory in the same method does not clear
-  the rule, and neither does hardening applied after the builder or parser was
-  created, where it cannot affect it. The empty
+  receiver the finding is about.** `disallow-doctype-decl`, and
+  `ACCESS_EXTERNAL_DTD` set to an empty string — on the factory through
+  `setAttribute` before the parser is created, or on the parser through
+  `setProperty` after it, which is the only SAX route to that property because
+  `SAXParserFactory` has neither method. The two routes carry opposite order
+  disciplines and both are enforced: FACTORY-level hardening applied once the
+  builder or parser already exists does not clear the rule, because it cannot
+  affect it, and neither does hardening a sibling factory in the same method.
+  The parser-level route is ordered against the creation call only, so a
+  `setProperty` placed after the `parse` call — where it is equally useless — is
+  not reported. The positive pattern ends at `newSAXParser()` rather than at the
+  parse, and that shape is contrived enough not to be worth extending it. The
+  empty
   value is part of the check: `ACCESS_EXTERNAL_DTD, "file"` still resolves
   `file://` external entities, so matching the constant name alone would clear
   the rule on code that is still exposed. `ACCESS_EXTERNAL_SCHEMA` on its own
