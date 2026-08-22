@@ -1,0 +1,12 @@
+---
+name: TEMP verify rule-pack pin
+on:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  semgrep:
+    uses: ./.github/workflows/reusable-polarion-semgrep.yml
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
