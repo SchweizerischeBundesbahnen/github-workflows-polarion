@@ -79,7 +79,7 @@ The same five trees were measured with the rule pack as it stood before
 hardening structurally, and the result is identical target by target and rule by
 rule. Widening those two rules to reach four more shapes introduced no finding on
 any real target, which is the only evidence that matters for whether the widening
-is safe to ship: their fixtures grew from 1 and 5 asserted cases to 5 and 6.
+is safe to ship: their fixtures grew from 1 and 5 asserted cases to 5 and 8.
 
 ## Known rule gaps
 
@@ -117,13 +117,19 @@ repeated in the header of the rule it applies to.
   any hardening anywhere in the class clears it. Accepted spellings of the
   hardening: the fully qualified class name as a string literal, directly or
   through a `static final String` constant that semgrep propagates, and
-  `SecureUberspector.class`. Hardening expressed any other way, or placed outside
-  the class, still produces a false positive.
-- **`polarion-xxe-unsafe-parser` accepts exactly two hardening forms, and
-  recognises them at method scope.** `disallow-doctype-decl`, and
-  `ACCESS_EXTERNAL_DTD` set to an empty string — on the factory through
-  `setAttribute`, or on the parser through `setProperty`, which is the only SAX
-  route to that property because `SAXParserFactory` has neither method. The empty
+  `SecureUberspector.class`. Both spellings are accepted from a method, a
+  constructor and a static initializer alike, and `class $CLASS { ... }` matches
+  an `enum` declaration, so an enum singleton holding an engine is covered.
+  Hardening expressed any other way, or placed outside the class, still produces
+  a false positive.
+- **`polarion-xxe-unsafe-parser` accepts exactly two hardening forms, on the
+  receiver the finding is about and before the parser is created.**
+  `disallow-doctype-decl`, and `ACCESS_EXTERNAL_DTD` set to an empty string — on
+  the factory through `setAttribute`, or on the parser through `setProperty`,
+  which is the only SAX route to that property because `SAXParserFactory` has
+  neither method. Hardening a sibling factory in the same method does not clear
+  the rule, and neither does hardening applied after the builder or parser was
+  created, where it cannot affect it. The empty
   value is part of the check: `ACCESS_EXTERNAL_DTD, "file"` still resolves
   `file://` external entities, so matching the constant name alone would clear
   the rule on code that is still exposed. `ACCESS_EXTERNAL_SCHEMA` on its own
@@ -131,9 +137,10 @@ repeated in the header of the rule it applies to.
   neither DOCTYPE processing nor external general entities. Nor does
   `FEATURE_SECURE_PROCESSING`: OWASP records that it "may not always mitigate
   entity expansion" and treats it as supplementary. Both negative cases are
-  pinned in the vulnerable fixture. The limitation is the scope: every clause is
-  scoped to the enclosing method, so hardening delegated to a helper method or
-  performed in a constructor does not clear the rule.
+  pinned in the vulnerable fixture, as are the sibling-factory and
+  hardened-too-late shapes. The limitation is the scope: every clause requires
+  the configuring call in the same statement sequence, so hardening delegated to
+  a helper method or performed in a constructor does not clear the rule.
 - **Both rules above match the configuring call structurally, not as text.** A
   `pattern-not-regex` is applied to the matched region as TEXT, which cost a
   false positive and a false negative at once and is worth stating explicitly

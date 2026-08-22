@@ -65,4 +65,26 @@ public class XxeVulnerable {
         DocumentBuilder builder = factory.newDocumentBuilder();
         return builder.parse(new InputSource(new StringReader(xml)));
     }
+
+    // Hardening one factory must not clear another in the same method: the
+    // suppression is tied to the receiver the positive pattern binds.
+    public void parseTwoFactories(String hardened, String exposed) throws Exception {
+        DocumentBuilderFactory safeFactory = DocumentBuilderFactory.newInstance();
+        safeFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        safeFactory.newDocumentBuilder().parse(new InputSource(new StringReader(hardened)));
+
+        // ruleid: polarion-xxe-unsafe-parser
+        DocumentBuilderFactory exposedFactory = DocumentBuilderFactory.newInstance();
+        exposedFactory.newDocumentBuilder().parse(new InputSource(new StringReader(exposed)));
+    }
+
+    // The feature is set after the builder exists, so it does not apply to that
+    // builder. Hardening has to sit between newInstance() and the creation call.
+    // ruleid: polarion-xxe-unsafe-parser
+    public Document parseDocHardenedTooLate(String xml) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        return builder.parse(new InputSource(new StringReader(xml)));
+    }
 }

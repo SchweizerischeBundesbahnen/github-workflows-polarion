@@ -37,16 +37,24 @@ rules:
       references:
         - https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
     pattern-either:
-      # Each hardening clause is a `pattern-not-inside` over the enclosing
-      # method rather than a `pattern-not-regex` over the matched region. Two
-      # reasons, both measured on semgrep 1.172.0. The region ends at
-      # `newSAXParser()`, so `parser.setProperty(ACCESS_EXTERNAL_DTD, "")` — the
-      # only SAX route to that property, because SAXParserFactory has no
-      # setAttribute and no setProperty — sat outside it and hardened SAX code
-      # was reported at ERROR. And a regex is applied to the region as TEXT, so a
-      # comment naming `disallow-doctype-decl` silenced the rule entirely.
-      # Matching the configuring call structurally fixes both, and keeps the
-      # region — hence the finding count — exactly as it was.
+      # Hardening is matched as a CALL, not as a regex over the matched region.
+      # A regex is applied to the region as text, which cost a false negative:
+      # a comment naming `disallow-doctype-decl` silenced the rule outright.
+      #
+      # Each factory-level clause is a `pattern-not` carrying the creation call,
+      # so the hardening has to sit on the SAME receiver the positive pattern
+      # binds AND between `newInstance()` and the creation. Scoping those
+      # clauses to the enclosing method instead — which is the obvious way to
+      # write this — is both receiver-blind and order-blind, and measurably so:
+      # hardening one factory cleared a second unhardened factory in the same
+      # method, and a `setFeature` call placed AFTER `newDocumentBuilder()`,
+      # where it cannot affect that builder, cleared the rule as well. Semgrep
+      # unifies `$FACTORY` from the positive pattern into these clauses, which is
+      # what makes the receiver binding hold; measured on 1.172.0.
+      #
+      # That order discipline is why the DOM, SAX and StAX branches do not share
+      # one `pattern-either` over their creation calls: the call that has to come
+      # last differs per branch, so it has to be named in each.
       #
       # ACCESS_EXTERNAL_DTD set to "" is the alternative OWASP documents where
       # DOCTYPE cannot be disabled, so it clears the rule. The empty value is
@@ -60,36 +68,50 @@ rules:
       #
       # `$QUALIFIER.ACCESS_EXTERNAL_DTD` matches the constant however it is
       # written — `XMLConstants.ACCESS_EXTERNAL_DTD`, the fully qualified
-      # `javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD`, and the bare form left by
-      # a static import. KNOWN LIMITATION: hardening outside a method body does
-      # not clear the rule, because every clause is scoped to a method.
+      # `javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD`, and the bare form left by a
+      # static import. KNOWN LIMITATION: hardening delegated to a helper method
+      # or performed in a constructor does not clear the rule, because every
+      # clause requires the call in the same statement sequence.
       - patterns:
-          - pattern-either:
-              - pattern: |
-                  $FACTORY = DocumentBuilderFactory.newInstance();
-                  ...
-                  $FACTORY.newDocumentBuilder();
-              - pattern: |
-                  $FACTORY = SAXParserFactory.newInstance();
-                  ...
-                  $FACTORY.newSAXParser();
+          - pattern: |
+              $FACTORY = DocumentBuilderFactory.newInstance();
+              ...
+              $FACTORY.newDocumentBuilder();
+          - pattern-not: |
+              $FACTORY = DocumentBuilderFactory.newInstance();
+              ...
+              $FACTORY.setFeature("=~/disallow-doctype-decl/", true);
+              ...
+              $FACTORY.newDocumentBuilder();
+          - pattern-not: |
+              $FACTORY = DocumentBuilderFactory.newInstance();
+              ...
+              $FACTORY.setAttribute($QUALIFIER.ACCESS_EXTERNAL_DTD, "");
+              ...
+              $FACTORY.newDocumentBuilder();
+      - patterns:
+          - pattern: |
+              $FACTORY = SAXParserFactory.newInstance();
+              ...
+              $FACTORY.newSAXParser();
+          - pattern-not: |
+              $FACTORY = SAXParserFactory.newInstance();
+              ...
+              $FACTORY.setFeature("=~/disallow-doctype-decl/", true);
+              ...
+              $FACTORY.newSAXParser();
+          # The parser-level route. SAXParserFactory has neither setAttribute nor
+          # setProperty, so this is the only SAX way to ACCESS_EXTERNAL_DTD, and
+          # it is necessarily reached AFTER newSAXParser() on a different object
+          # — hence a method-scoped clause here rather than a `pattern-not`. The
+          # receiver is still bound: $PARSER is the object newSAXParser()
+          # returned, and $FACTORY unifies with the positive pattern.
           - pattern-not-inside: |
               $RET $METHOD(...) {
                 ...
-                $X.setFeature("=~/disallow-doctype-decl/", true);
+                $PARSER = $FACTORY.newSAXParser();
                 ...
-              }
-          - pattern-not-inside: |
-              $RET $METHOD(...) {
-                ...
-                $X.setAttribute($QUALIFIER.ACCESS_EXTERNAL_DTD, "");
-                ...
-              }
-          # The parser-level route, reachable only after newSAXParser().
-          - pattern-not-inside: |
-              $RET $METHOD(...) {
-                ...
-                $X.setProperty($QUALIFIER.ACCESS_EXTERNAL_DTD, "");
+                $PARSER.setProperty($QUALIFIER.ACCESS_EXTERNAL_DTD, "");
                 ...
               }
       - patterns:
@@ -99,15 +121,15 @@ rules:
               $FACTORY.createXMLStreamReader(...);
           # Either property alone clears the StAX branch, and the value is part
           # of the pattern for the same reason it is above.
-          - pattern-not-inside: |
-              $RET $METHOD(...) {
-                ...
-                $X.setProperty($QUALIFIER.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
-                ...
-              }
-          - pattern-not-inside: |
-              $RET $METHOD(...) {
-                ...
-                $X.setProperty($QUALIFIER.SUPPORT_DTD, false);
-                ...
-              }
+          - pattern-not: |
+              $FACTORY = XMLInputFactory.newInstance();
+              ...
+              $FACTORY.setProperty($QUALIFIER.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+              ...
+              $FACTORY.createXMLStreamReader(...);
+          - pattern-not: |
+              $FACTORY = XMLInputFactory.newInstance();
+              ...
+              $FACTORY.setProperty($QUALIFIER.SUPPORT_DTD, false);
+              ...
+              $FACTORY.createXMLStreamReader(...);

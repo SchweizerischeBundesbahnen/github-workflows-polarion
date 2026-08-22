@@ -75,6 +75,13 @@ rules:
       # any hardening anywhere in the class clears these, which is the price of
       # reaching the field-initializer shape at all. Constant propagation covers
       # the class-scope `static final String` spelling of the FQCN.
+      #
+      # Both spellings are repeated for each of the three members, because the
+      # two are separate patterns and a member clause carrying only the string
+      # literal reports hardened code: `SecureUberspector.class.getName()` in a
+      # constructor is not a string literal and constant propagation does not
+      # make it one. `class $CLASS { ... }` matches an `enum` declaration too,
+      # so an enum singleton holding an engine is covered by these clauses.
       - patterns:
           - pattern: new VelocityEngine(...)
           - pattern-not-inside: |
@@ -114,9 +121,29 @@ rules:
           - pattern-not-inside: |
               class $CLASS {
                 ...
+                $CLASS(...) {
+                  ...
+                  $CALL(..., <... SecureUberspector.class ...>, ...);
+                  ...
+                }
+                ...
+              }
+          - pattern-not-inside: |
+              class $CLASS {
+                ...
                 static {
                   ...
                   $CALL(..., "=~/SecureUberspector/", ...);
+                  ...
+                }
+                ...
+              }
+          - pattern-not-inside: |
+              class $CLASS {
+                ...
+                static {
+                  ...
+                  $CALL(..., <... SecureUberspector.class ...>, ...);
                   ...
                 }
                 ...

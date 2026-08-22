@@ -88,3 +88,47 @@ class VelocitySstiFixedConstant {
         return new VelocityEngine(props);
     }
 }
+
+// ok: polarion-velocity-ssti — the class named rather than spelled as a literal,
+// from a constructor, where no method-scoped clause can apply
+class VelocitySstiFixedConstructorClassLiteral {
+
+    private final VelocityEngine engine;
+
+    VelocitySstiFixedConstructorClassLiteral() {
+        Properties props = new Properties();
+        props.setProperty(RuntimeConstants.UBERSPECT_CLASSNAME, SecureUberspector.class.getName());
+        this.engine = new VelocityEngine(props);
+    }
+}
+
+// ok: polarion-velocity-ssti — the same spelling from a static initializer
+class VelocitySstiFixedStaticInitializerClassLiteral {
+
+    private static final Properties PROPS = new Properties();
+
+    static {
+        PROPS.setProperty(RuntimeConstants.UBERSPECT_CLASSNAME, SecureUberspector.class.getName());
+    }
+
+    private static final VelocityEngine ENGINE = new VelocityEngine(PROPS);
+}
+
+// ok: polarion-velocity-ssti — an enum singleton, which `class $CLASS { ... }`
+// matches, so the class-scoped clauses reach it
+enum VelocitySstiFixedEnum {
+
+    INSTANCE;
+
+    private final VelocityEngine engine;
+
+    VelocitySstiFixedEnum() {
+        Properties props = new Properties();
+        props.setProperty(RuntimeConstants.UBERSPECT_CLASSNAME, SecureUberspector.class.getName());
+        this.engine = new VelocityEngine(props);
+    }
+
+    VelocityEngine engine() {
+        return engine;
+    }
+}
