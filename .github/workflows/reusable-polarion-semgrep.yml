@@ -3,14 +3,6 @@ name: Polarion Semgrep (reusable)
 on:
   workflow_call:
     inputs:
-      rules-ref:
-        description: |
-          Ref of github-workflows-polarion to take the rule pack from. Keep it
-          equal to the ref in the caller's `uses:` line, otherwise the rules and
-          the workflow that runs them can drift apart.
-        required: false
-        type: string
-        default: main
       semgrep-version:
         description: |
           Semgrep version to run. Empty uses the version pinned in
@@ -66,8 +58,15 @@ jobs:
       - name: Checkout Polarion rule pack
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          repository: ${{ github.repository_owner }}/github-workflows-polarion
-          ref: ${{ inputs.rules-ref }}
+          # The pack comes from this workflow's own commit rather than from a
+          # caller-supplied ref, so the rules and the workflow that runs them
+          # cannot drift apart and a caller cannot point the checkout at an
+          # arbitrary ref. `job.workflow_repository` and `job.workflow_sha` are
+          # the documented way for a reusable workflow to reach its own source;
+          # both are unavailable on GitHub Enterprise Server, which this
+          # repository does not target.
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
           path: .polarion-rules
           sparse-checkout: polarion-semgrep-rules
           persist-credentials: false
