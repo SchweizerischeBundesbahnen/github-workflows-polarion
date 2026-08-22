@@ -125,6 +125,10 @@ public class XxeFixed {
     // statement ellipsis descends into. An anonymous class's method body is the
     // boundary it does not cross; that shape is a documented false positive and
     // has no annotation here, because a `ruleid:` would assert it as correct.
+    // Note what this case does NOT pin: harden.run() is matched by no clause, so
+    // it is not what clears the rule. Deleting it leaves the rule equally silent
+    // on a factory that reaches newDocumentBuilder() with nothing applied, which
+    // is recorded as a known silence rather than pinned here.
     public Document parseDocHardenedInLambda(String xml) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         Runnable harden = () -> {

@@ -162,18 +162,21 @@ repeated in the header of the rule it applies to.
   The limitation is the scope: every clause requires the configuring call in the
   same METHOD as the creation, so hardening delegated to a helper method or
   performed in a constructor does not clear the rule. Block nesting inside that
-  method is fine — the statement ellipsis descends into a `try`, `if` or loop
-  body, which matters because the OWASP cheat sheet's own DOM example wraps
-  `setFeature` in `try`/`catch`; both depths are pinned in the fixed fixture. A
-  it descends into a lambda body as well. What it does not descend into is an
-  anonymous class's method body, so hardening performed there still reports —
-  the one shape of the three that is a false positive. That descent is
-  unconditional, which
-  cuts the other way too: hardening behind an `if` clears the rule even though
-  the branch not taken reaches the parser unhardened. Semgrep matches statements,
-  not paths, so this is a limitation of the analysis rather than of these
-  clauses — and the shape is worth knowing about, because it is a real
-  exploitable configuration the rule stays silent on.
+  method is fine at any depth — the statement ellipsis descends into a `try`,
+  `if` or loop body, which matters because the OWASP cheat sheet's own DOM
+  example wraps `setFeature` in `try`/`catch`, and both depths are pinned in the
+  fixed fixture. It descends into a lambda body as well. The one boundary it does
+  not cross is an anonymous class's method body, so hardening performed there
+  still reports, which is a false positive.
+
+  That descent is unconditional, and it cuts the other way. Hardening behind an
+  `if` clears the rule although the branch not taken reaches the parser
+  unhardened; hardening in a lambda body clears it without the lambda ever being
+  invoked, because no clause matches the call that would run it, so there the
+  hardening need not be on any executed path at all. Semgrep matches statements,
+  not paths, so both are limitations of the analysis rather than of these
+  clauses. Both are real exploitable configurations the rule stays silent on, and
+  the lambda is the worse of the two.
 - **Both rules above match the configuring call structurally, not as text.** A
   `pattern-not-regex` is applied to the matched region as TEXT, which cost a
   false positive and a false negative at once and is worth stating explicitly

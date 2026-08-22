@@ -79,6 +79,12 @@ rules:
       # class's method body, so hardening performed there still reports. All
       # three outcomes measured on 1.172.0; the cleared ones are pinned in the
       # fixed fixture, the anonymous-class one is a documented false positive.
+      #
+      # The descent is also unconditional, which is a silence rather than a
+      # false positive: hardening behind an `if` clears the rule although the
+      # other branch reaches the parser unhardened, and hardening in a lambda
+      # clears it even if the lambda is never invoked, because no clause matches
+      # the call that would run it. Semgrep matches statements, not paths.
       - patterns:
           - pattern: |
               $FACTORY = DocumentBuilderFactory.newInstance();
