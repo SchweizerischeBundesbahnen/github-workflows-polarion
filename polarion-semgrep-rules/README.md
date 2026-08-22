@@ -166,7 +166,12 @@ repeated in the header of the rule it applies to.
   body, which matters because the OWASP cheat sheet's own DOM example wraps
   `setFeature` in `try`/`catch`; both depths are pinned in the fixed fixture. A
   nested method BODY is not: hardening performed inside an anonymous class or a
-  lambda within the method still reports.
+  lambda within the method still reports. That descent is unconditional, which
+  cuts the other way too: hardening behind an `if` clears the rule even though
+  the branch not taken reaches the parser unhardened. Semgrep matches statements,
+  not paths, so this is a limitation of the analysis rather than of these
+  clauses — and the shape is worth knowing about, because it is a real
+  exploitable configuration the rule stays silent on.
 - **Both rules above match the configuring call structurally, not as text.** A
   `pattern-not-regex` is applied to the matched region as TEXT, which cost a
   false positive and a false negative at once and is worth stating explicitly

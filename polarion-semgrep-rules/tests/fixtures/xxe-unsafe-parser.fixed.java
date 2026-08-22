@@ -104,13 +104,18 @@ public class XxeFixed {
     }
 
     // ok: polarion-xxe-unsafe-parser — hardening two blocks deep, so the
-    // ellipsis is asserted to descend at any block depth rather than one level
-    public Document parseDocHardenedTwoBlocksDeep(String xml, boolean strict) throws Exception {
+    // ellipsis is asserted to descend at any block depth rather than one level.
+    // Differs from parseDocHardenedInTryBlock in depth alone: the hardening is
+    // unconditional, so a future clause that starts firing here localises to
+    // depth rather than to some other property of the case.
+    public Document parseDocHardenedTwoBlocksDeep(String xml) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        if (strict) {
+        try {
             for (int i = 0; i < 1; i++) {
                 factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             }
+        } catch (ParserConfigurationException e) {
+            // a real caller logs this
         }
         DocumentBuilder builder = factory.newDocumentBuilder();
         return builder.parse(new InputSource(new StringReader(xml)));
