@@ -37,6 +37,32 @@ rules:
       references:
         - https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
     pattern-either:
+      # Each hardening clause is a `pattern-not-inside` over the enclosing
+      # method rather than a `pattern-not-regex` over the matched region. Two
+      # reasons, both measured on semgrep 1.172.0. The region ends at
+      # `newSAXParser()`, so `parser.setProperty(ACCESS_EXTERNAL_DTD, "")` — the
+      # only SAX route to that property, because SAXParserFactory has no
+      # setAttribute and no setProperty — sat outside it and hardened SAX code
+      # was reported at ERROR. And a regex is applied to the region as TEXT, so a
+      # comment naming `disallow-doctype-decl` silenced the rule entirely.
+      # Matching the configuring call structurally fixes both, and keeps the
+      # region — hence the finding count — exactly as it was.
+      #
+      # ACCESS_EXTERNAL_DTD set to "" is the alternative OWASP documents where
+      # DOCTYPE cannot be disabled, so it clears the rule. The empty value is
+      # part of the pattern: `ACCESS_EXTERNAL_DTD, "file"` still resolves file://
+      # external entities, so accepting the constant name alone would clear the
+      # rule on code that is still exposed. ACCESS_EXTERNAL_SCHEMA is not
+      # accepted on its own — restricting schema resolution does nothing about
+      # DOCTYPE processing or external general entities. FEATURE_SECURE_PROCESSING
+      # is not accepted either: OWASP records that it "may not always mitigate
+      # entity expansion" and treats it as supplementary.
+      #
+      # `$QUALIFIER.ACCESS_EXTERNAL_DTD` matches the constant however it is
+      # written — `XMLConstants.ACCESS_EXTERNAL_DTD`, the fully qualified
+      # `javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD`, and the bare form left by
+      # a static import. KNOWN LIMITATION: hardening outside a method body does
+      # not clear the rule, because every clause is scoped to a method.
       - patterns:
           - pattern-either:
               - pattern: |
@@ -47,27 +73,41 @@ rules:
                   $FACTORY = SAXParserFactory.newInstance();
                   ...
                   $FACTORY.newSAXParser();
-          # ACCESS_EXTERNAL_DTD set to "" is the alternative OWASP documents
-          # where DOCTYPE cannot be disabled, so it clears the rule. The empty
-          # value is part of the pattern: `ACCESS_EXTERNAL_DTD, "file"` still
-          # resolves file:// external entities, so matching the constant name
-          # alone would clear the rule on code that is still exposed.
-          # ACCESS_EXTERNAL_SCHEMA is not accepted on its own — restricting
-          # schema resolution does nothing about DOCTYPE processing or external
-          # general entities. FEATURE_SECURE_PROCESSING is not accepted either:
-          # OWASP records that it "may not always mitigate entity expansion"
-          # and treats it as supplementary.
-          #
-          # KNOWN LIMITATION: this clause can only clear the DocumentBuilder
-          # branch. SAXParserFactory has no setAttribute, so the SAX route to
-          # ACCESS_EXTERNAL_DTD is parser.setProperty(...) AFTER newSAXParser(),
-          # which falls outside the matched region — hardened SAX code of that
-          # shape is a false positive. disallow-doctype-decl is unaffected,
-          # because factory.setFeature(...) precedes newSAXParser().
-          - pattern-not-regex: 'disallow-doctype-decl|ACCESS_EXTERNAL_DTD[^,)]*,\s*""'
+          - pattern-not-inside: |
+              $RET $METHOD(...) {
+                ...
+                $X.setFeature("=~/disallow-doctype-decl/", true);
+                ...
+              }
+          - pattern-not-inside: |
+              $RET $METHOD(...) {
+                ...
+                $X.setAttribute($QUALIFIER.ACCESS_EXTERNAL_DTD, "");
+                ...
+              }
+          # The parser-level route, reachable only after newSAXParser().
+          - pattern-not-inside: |
+              $RET $METHOD(...) {
+                ...
+                $X.setProperty($QUALIFIER.ACCESS_EXTERNAL_DTD, "");
+                ...
+              }
       - patterns:
           - pattern: |
               $FACTORY = XMLInputFactory.newInstance();
               ...
               $FACTORY.createXMLStreamReader(...);
-          - pattern-not-regex: 'IS_SUPPORTING_EXTERNAL_ENTITIES|SUPPORT_DTD'
+          # Either property alone clears the StAX branch, and the value is part
+          # of the pattern for the same reason it is above.
+          - pattern-not-inside: |
+              $RET $METHOD(...) {
+                ...
+                $X.setProperty($QUALIFIER.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+                ...
+              }
+          - pattern-not-inside: |
+              $RET $METHOD(...) {
+                ...
+                $X.setProperty($QUALIFIER.SUPPORT_DTD, false);
+                ...
+              }

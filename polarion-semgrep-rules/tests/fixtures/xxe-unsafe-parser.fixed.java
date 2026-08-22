@@ -1,5 +1,9 @@
 package ch.sbb.polarion.extension.example.xxe;
 
+import static javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD;
+import static javax.xml.XMLConstants.ACCESS_EXTERNAL_SCHEMA;
+
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.SAXParser;
@@ -50,5 +54,25 @@ public class XxeFixed {
         while (reader.hasNext()) {
             reader.next();
         }
+    }
+
+    // ok: polarion-xxe-unsafe-parser — ACCESS_EXTERNAL_DTD emptied on the parser
+    // rather than the factory, which is the only SAX route to that property
+    public void parseSaxParserLevel(String xml) throws Exception {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        SAXParser parser = factory.newSAXParser();
+        parser.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        parser.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        parser.parse(new InputSource(new StringReader(xml)), null);
+    }
+
+    // ok: polarion-xxe-unsafe-parser — the constant reached through a static
+    // import, so the accepted spelling does not depend on the qualifier
+    public Document parseDocStaticImport(String xml) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setAttribute(ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(ACCESS_EXTERNAL_SCHEMA, "");
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        return builder.parse(new InputSource(new StringReader(xml)));
     }
 }

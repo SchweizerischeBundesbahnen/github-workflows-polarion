@@ -58,21 +58,28 @@ The rules were tuned to a locked-in baseline of **13 findings** on 2026-05-06,
 at the SHAs recorded then: api-extender 1, generic 2, pdf-exporter 0,
 docx-exporter 0, diff-tool 10.
 
-Re-measured against current `main` on 2026-08-19, semgrep 1.172.0:
+Re-measured against current `main` on 2026-08-22, semgrep 1.172.0:
 
 | Target | `main` SHA | Findings |
 |---|---|---|
-| api-extender | 6d7f5a7 | 1 |
-| generic | 2d48baa | 2 |
-| pdf-exporter | 28efc27 | 0 |
-| docx-exporter | 147532a | 0 |
-| diff-tool | 77ae24c | 15 |
+| api-extender | ede37c6 | 1 |
+| generic | dbf2f6e | 2 |
+| pdf-exporter | ce31ac1 | 0 |
+| docx-exporter | f8d956f | 0 |
+| diff-tool | 079d9f7 | 15 |
 
 18 in total. Every one is `polarion-transaction-no-permission-check` at INFO;
 diff-tool gained five as new transactions were added since May. The other seven
 rules fire nowhere on the corpus and act as regression guards on new code. Treat
 that as the point of the pack in CI today: it is not a backlog of findings to
 clear.
+
+The same five trees were measured with the rule pack as it stood before
+`polarion-velocity-ssti` and `polarion-xxe-unsafe-parser` were rewritten to match
+hardening structurally, and the result is identical target by target and rule by
+rule. Widening those two rules to reach four more shapes introduced no finding on
+any real target, which is the only evidence that matters for whether the widening
+is safe to ship: their fixtures grew from 1 and 5 asserted cases to 5 and 6.
 
 ## Known rule gaps
 
@@ -99,28 +106,45 @@ repeated in the header of the rule it applies to.
   the request's actual user, not as an elevated subject. Extension-level
   `checkPermission` is therefore defense-in-depth. The rule still catches
   mutations made outside a platform API — raw JDBC, direct file IO, reflection.
-- **`polarion-velocity-ssti` matches at method scope, in both directions.** A
-  `SecureUberspector` configured through class-scope constants is invisible to
-  the method-level `pattern-not-regex`, so that shape produces a false positive.
-  In the other direction the rule requires `new VelocityEngine(...)` as a bare
-  statement inside a method declaration, so three shapes are missed silently: a
-  field initializer (`private static final VelocityEngine ENGINE = new
-  VelocityEngine();`), a construction inside a constructor, which has no return
-  type for the pattern to bind, and `return new VelocityEngine(props);`. The
-  last of these is annotated `known-miss:` in the vulnerable fixture. Widening
-  the pattern is not a one-line change — adding a `pattern-regex` narrows the
-  match region so the `SecureUberspector` suppression stops working — so it is
-  tracked separately rather than bundled here.
-- **`polarion-xxe-unsafe-parser` accepts exactly two hardening forms.**
-  `disallow-doctype-decl`, and `ACCESS_EXTERNAL_DTD` set to an empty string. The
-  empty value is part of the check: `ACCESS_EXTERNAL_DTD, "file"` still resolves
+- **`polarion-velocity-ssti` suppression is class-scoped wherever the
+  construction has no enclosing method.** The match is `new VelocityEngine(...)`
+  itself, so all four shapes are reached — a bare statement, `return new
+  VelocityEngine(...)`, a field initializer, and a construction inside a
+  constructor — and the finding lands on the construction line rather than on the
+  enclosing declaration. Where the construction sits inside a method the
+  suppression is scoped to that method, so a hardened sibling does not clear an
+  unhardened one; where it does not, the only scope available is the class, and
+  any hardening anywhere in the class clears it. Accepted spellings of the
+  hardening: the fully qualified class name as a string literal, directly or
+  through a `static final String` constant that semgrep propagates, and
+  `SecureUberspector.class`. Hardening expressed any other way, or placed outside
+  the class, still produces a false positive.
+- **`polarion-xxe-unsafe-parser` accepts exactly two hardening forms, and
+  recognises them at method scope.** `disallow-doctype-decl`, and
+  `ACCESS_EXTERNAL_DTD` set to an empty string — on the factory through
+  `setAttribute`, or on the parser through `setProperty`, which is the only SAX
+  route to that property because `SAXParserFactory` has neither method. The empty
+  value is part of the check: `ACCESS_EXTERNAL_DTD, "file"` still resolves
   `file://` external entities, so matching the constant name alone would clear
   the rule on code that is still exposed. `ACCESS_EXTERNAL_SCHEMA` on its own
   does not clear it either, because restricting schema resolution addresses
   neither DOCTYPE processing nor external general entities. Nor does
   `FEATURE_SECURE_PROCESSING`: OWASP records that it "may not always mitigate
   entity expansion" and treats it as supplementary. Both negative cases are
-  pinned in the vulnerable fixture.
+  pinned in the vulnerable fixture. The limitation is the scope: every clause is
+  scoped to the enclosing method, so hardening delegated to a helper method or
+  performed in a constructor does not clear the rule.
+- **Both rules above match the configuring call structurally, not as text.** A
+  `pattern-not-regex` is applied to the matched region as TEXT, which cost a
+  false positive and a false negative at once and is worth stating explicitly
+  because the failure is silent in both directions. Measured on semgrep 1.172.0:
+  hardened SAX code was reported at ERROR because the matched region ended at
+  `newSAXParser()` and the `parser.setProperty(...)` call sat past it; and a
+  comment naming `SecureUberspector` or `disallow-doctype-decl` inside the region
+  cleared the rule outright, which is how a genuinely vulnerable case in this
+  pack's own fixture came to be recorded as a shape the pattern could not reach.
+  Widening a region-scoped regex is not the fix — it moves the region — so both
+  rules express hardening as a `pattern-not-inside` over the enclosing scope.
 - **`polarion-weasyprint-pre-68` cannot match a specifier split across
   lines.** Two forms are out of reach, both because TOML spreads them over more
   than one line and every alternative is single-line: a `poetry.lock` entry

@@ -54,4 +54,15 @@ public class XxeVulnerable {
         DocumentBuilder builder = factory.newDocumentBuilder();
         return builder.parse(new InputSource(new StringReader(xml)));
     }
+
+    // A comment naming the hardening feature must not suppress the finding. The
+    // earlier suppression was a `pattern-not-regex` over the matched region,
+    // which matched comment text as readily as code.
+    // ruleid: polarion-xxe-unsafe-parser
+    public Document parseDocCommentOnly(String xml) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        // TODO: set disallow-doctype-decl here before shipping
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        return builder.parse(new InputSource(new StringReader(xml)));
+    }
 }
