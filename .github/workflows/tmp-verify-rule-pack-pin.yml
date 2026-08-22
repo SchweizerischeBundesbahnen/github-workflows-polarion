@@ -1,7 +1,8 @@
 ---
 name: TEMP verify rule-pack pin
 on:
-  workflow_dispatch:
+  push:
+    branches: [fix/semgrep-rule-pack-pin]
 permissions: {}
 jobs:
   semgrep:
