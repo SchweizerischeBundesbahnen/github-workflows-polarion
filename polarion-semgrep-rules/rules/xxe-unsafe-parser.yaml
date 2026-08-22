@@ -69,9 +69,14 @@ rules:
       # `$QUALIFIER.ACCESS_EXTERNAL_DTD` matches the constant however it is
       # written — `XMLConstants.ACCESS_EXTERNAL_DTD`, the fully qualified
       # `javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD`, and the bare form left by a
-      # static import. KNOWN LIMITATION: hardening delegated to a helper method
-      # or performed in a constructor does not clear the rule, because every
-      # clause requires the call in the same statement sequence.
+      # static import. KNOWN LIMITATION: every clause requires the configuring
+      # call in the same METHOD as the creation, so hardening delegated to a
+      # helper method or performed in a constructor does not clear the rule.
+      # Block nesting inside that method is fine — the statement ellipsis
+      # descends into a `try`, `if` or loop body, which matters because the OWASP
+      # cheat sheet wraps setFeature in try/catch — but a nested method BODY is
+      # not, so hardening inside an anonymous class or a lambda still reports.
+      # Measured on 1.172.0; both cleared depths are pinned in the fixed fixture.
       - patterns:
           - pattern: |
               $FACTORY = DocumentBuilderFactory.newInstance();

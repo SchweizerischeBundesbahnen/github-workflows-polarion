@@ -79,7 +79,7 @@ The same five trees were measured with the rule pack as it stood before
 hardening structurally, and the result is identical target by target and rule by
 rule. Widening those two rules to reach four more shapes introduced no finding on
 any real target, which is the only evidence that matters for whether the widening
-is safe to ship: their fixtures grew from 1 and 5 asserted cases to 5 and 8.
+is safe to ship: their fixtures grew from 1 and 5 asserted cases to 5 and 9.
 
 ## Known rule gaps
 
@@ -157,9 +157,16 @@ repeated in the header of the rule it applies to.
   of hardening. Rejected earlier and worth not retrying: widening the SAX
   positive pattern past the factory call, which makes the region overlap itself
   and produces duplicate findings on unhardened code without clearing the
-  hardened one — the parser-level clause exists because of that. The limitation is the scope: every clause requires
-  the configuring call in the same statement sequence, so hardening delegated to
-  a helper method or performed in a constructor does not clear the rule.
+  hardened one — the parser-level clause exists because of that.
+
+  The limitation is the scope: every clause requires the configuring call in the
+  same METHOD as the creation, so hardening delegated to a helper method or
+  performed in a constructor does not clear the rule. Block nesting inside that
+  method is fine — the statement ellipsis descends into a `try`, `if` or loop
+  body, which matters because the OWASP cheat sheet's own DOM example wraps
+  `setFeature` in `try`/`catch`; both depths are pinned in the fixed fixture. A
+  nested method BODY is not: hardening performed inside an anonymous class or a
+  lambda within the method still reports.
 - **Both rules above match the configuring call structurally, not as text.** A
   `pattern-not-regex` is applied to the matched region as TEXT, which cost a
   false positive and a false negative at once and is worth stating explicitly

@@ -102,4 +102,17 @@ public class XxeFixed {
             reader.next();
         }
     }
+
+    // ok: polarion-xxe-unsafe-parser — hardening two blocks deep, so the
+    // ellipsis is asserted to descend at any block depth rather than one level
+    public Document parseDocHardenedTwoBlocksDeep(String xml, boolean strict) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        if (strict) {
+            for (int i = 0; i < 1; i++) {
+                factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            }
+        }
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        return builder.parse(new InputSource(new StringReader(xml)));
+    }
 }
