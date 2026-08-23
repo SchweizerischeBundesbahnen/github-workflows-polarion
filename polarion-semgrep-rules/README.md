@@ -32,8 +32,10 @@ Re-measure the corpus with `POLARION_TARGETS_DIR=<dir> bash polarion-semgrep-rul
 Probe a rule against arbitrary code — a shape a review comment describes, a hardening spelling no
 fixture pins yet — with `bash polarion-semgrep-rules/tests/probe_rule.sh <rule|rules-dir>
 <target>…`. It answers what a rule does to one file, which is the question a rule change raises
-before a fixture exists for it, and it refuses to print a finding count when semgrep exited
-non-zero.
+before a fixture exists for it. It refuses to print a finding count when semgrep exited non-zero,
+and prints the scanned-file count beside the finding count, because a target semgrep never read —
+an extension that does not map to the rule's language, a path on the built-in `.semgrepignore` —
+otherwise reports 0 findings and exit 0 just like a rule that matched nothing.
 
 `jq` is required. A rule missing either fixture fails the suite rather than
 being skipped, and the number of rules tested is asserted against the number of

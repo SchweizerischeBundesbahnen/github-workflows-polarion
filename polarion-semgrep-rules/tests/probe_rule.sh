@@ -7,12 +7,20 @@
 # raises before a fixture exists for it: the shape a review comment describes, a
 # hardening spelling nobody has pinned, a suspected false positive.
 #
-# It exists because semgrep's own failure mode is silence. An invalid rule file
-# makes semgrep load no rule at all from a --config directory and exit 7 with
-# both streams empty under --quiet, so a hand-rolled probe that ignores the exit
-# status reports 0 findings for a rule that never ran — indistinguishable from a
-# rule that ran and matched nothing. This checks the status, surfaces .errors[],
-# and pins the semgrep version the rule baseline was measured on.
+# It exists because semgrep's own failure mode is silence, and the silence has
+# two doors. An invalid rule file makes semgrep load no rule at all from a
+# --config directory and exit 7 with both streams empty under --quiet. A target
+# semgrep never scans — an extension that does not map to the rule's language, a
+# path on the built-in .semgrepignore — reports no finding and exits 0. Either
+# way a hand-rolled probe prints 0 for code no rule was run against, which is
+# indistinguishable from a rule that ran and matched nothing. This checks the
+# status, surfaces .errors[], reports how many files were actually scanned, and
+# pins the semgrep version the rule baseline was measured on.
+#
+# --no-rewrite-rule-ids keeps the printed check_id equal to the rule file's own
+# id: semgrep otherwise prefixes it with the --config path, so the ids printed
+# here would match neither the rule files, nor the ruleid: annotations in
+# tests/fixtures/, nor measure_corpus.sh's per-rule breakdown.
 #
 # Usage:
 #   tests/probe_rule.sh <rule.yaml|rules-dir> <target>...
@@ -56,7 +64,8 @@ for target in "$@"; do
     printf '=== %s ===\n' "${target}"
 
     set +e
-    json=$("${SEMGREP_CMD[@]}" --metrics off --json --quiet --config "${rule}" "${target}")
+    json=$("${SEMGREP_CMD[@]}" --metrics off --json --quiet --no-rewrite-rule-ids \
+        --config "${rule}" "${target}")
     rc=$?
     set -e
 
@@ -70,7 +79,16 @@ for target in "$@"; do
     fi
 
     printf '%s' "${json}" | jq -r '.errors[]? | "  ERROR \(.level): \((.message // "") | split("\n")[0])"'
-    printf 'count=%s\n' "$(printf '%s' "${json}" | jq '.results | length')"
+    # A count is only an answer about code semgrep actually read, so print the
+    # scanned-file count beside it and say so outright when it is zero.
+    scanned=$(printf '%s' "${json}" | jq '.paths.scanned | length')
+    printf 'count=%s (scanned %s file(s))\n' \
+        "$(printf '%s' "${json}" | jq '.results | length')" "${scanned}"
+    if [[ "${scanned}" -eq 0 ]]; then
+        printf '  NOTE: semgrep scanned nothing here — the extension does not map to the\n'
+        printf '        rule language, or the path is skipped by .semgrepignore. The count\n'
+        printf '        above says nothing about this code.\n'
+    fi
     printf '%s' "${json}" | jq -r '.results[] | "  \(.path):\(.start.line)  \(.check_id)"'
 done
 
