@@ -37,37 +37,138 @@ rules:
       references:
         - https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
     pattern-either:
+      # Hardening is matched as a CALL, not as a regex over the matched region.
+      # A regex is applied to the region as text, which cost a false negative:
+      # a comment naming `disallow-doctype-decl` silenced the rule outright.
+      #
+      # Each factory-level clause is a `pattern-not` carrying the creation call,
+      # so the hardening has to sit on the SAME receiver the positive pattern
+      # binds AND between `newInstance()` and the creation. Scoping those
+      # clauses to the enclosing method instead — which is the obvious way to
+      # write this — is both receiver-blind and order-blind, and measurably so:
+      # hardening one factory cleared a second unhardened factory in the same
+      # method, and a `setFeature` call placed AFTER `newDocumentBuilder()`,
+      # where it cannot affect that builder, cleared the rule as well. Semgrep
+      # unifies `$FACTORY` from the positive pattern into these clauses, which is
+      # what makes the receiver binding hold; measured on 1.172.0.
+      #
+      # That order discipline is why the DOM, SAX and StAX branches do not share
+      # one `pattern-either` over their creation calls: the call that has to come
+      # last differs per branch, so it has to be named in each.
+      #
+      # ACCESS_EXTERNAL_DTD set to "" is the alternative OWASP documents where
+      # DOCTYPE cannot be disabled, so it clears the rule. The empty value is
+      # part of the pattern: `ACCESS_EXTERNAL_DTD, "file"` still resolves file://
+      # external entities, so accepting the constant name alone would clear the
+      # rule on code that is still exposed. ACCESS_EXTERNAL_SCHEMA is not
+      # accepted on its own — restricting schema resolution does nothing about
+      # DOCTYPE processing or external general entities. FEATURE_SECURE_PROCESSING
+      # is not accepted either: OWASP records that it "may not always mitigate
+      # entity expansion" and treats it as supplementary.
+      #
+      # `$QUALIFIER.ACCESS_EXTERNAL_DTD` matches the constant however it is
+      # written — `XMLConstants.ACCESS_EXTERNAL_DTD`, the fully qualified
+      # `javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD`, and the bare form left by a
+      # static import. KNOWN LIMITATION: every clause requires the configuring
+      # call in the same METHOD as the creation, so hardening delegated to a
+      # helper method or performed in a constructor does not clear the rule.
+      # Block nesting inside that method is fine at any depth — the statement
+      # ellipsis descends into a `try`, `if` or loop body, which matters because
+      # the OWASP cheat sheet wraps setFeature in try/catch — and it descends
+      # into a LAMBDA body as well. It does not descend into an anonymous
+      # class's method body, so hardening performed there still reports. All
+      # three outcomes measured on 1.172.0; the cleared ones are pinned in the
+      # fixed fixture, the anonymous-class one is a documented false positive.
+      #
+      # The descent is also unconditional, which is a silence rather than a
+      # false positive: hardening behind an `if` clears the rule although the
+      # other branch reaches the parser unhardened, and hardening in a lambda
+      # clears it even if the lambda is never invoked, because no clause matches
+      # the call that would run it. Semgrep matches statements, not paths.
       - patterns:
-          - pattern-either:
-              - pattern: |
-                  $FACTORY = DocumentBuilderFactory.newInstance();
-                  ...
-                  $FACTORY.newDocumentBuilder();
-              - pattern: |
-                  $FACTORY = SAXParserFactory.newInstance();
-                  ...
-                  $FACTORY.newSAXParser();
-          # ACCESS_EXTERNAL_DTD set to "" is the alternative OWASP documents
-          # where DOCTYPE cannot be disabled, so it clears the rule. The empty
-          # value is part of the pattern: `ACCESS_EXTERNAL_DTD, "file"` still
-          # resolves file:// external entities, so matching the constant name
-          # alone would clear the rule on code that is still exposed.
-          # ACCESS_EXTERNAL_SCHEMA is not accepted on its own — restricting
-          # schema resolution does nothing about DOCTYPE processing or external
-          # general entities. FEATURE_SECURE_PROCESSING is not accepted either:
-          # OWASP records that it "may not always mitigate entity expansion"
-          # and treats it as supplementary.
-          #
-          # KNOWN LIMITATION: this clause can only clear the DocumentBuilder
-          # branch. SAXParserFactory has no setAttribute, so the SAX route to
-          # ACCESS_EXTERNAL_DTD is parser.setProperty(...) AFTER newSAXParser(),
-          # which falls outside the matched region — hardened SAX code of that
-          # shape is a false positive. disallow-doctype-decl is unaffected,
-          # because factory.setFeature(...) precedes newSAXParser().
-          - pattern-not-regex: 'disallow-doctype-decl|ACCESS_EXTERNAL_DTD[^,)]*,\s*""'
+          - pattern: |
+              $FACTORY = DocumentBuilderFactory.newInstance();
+              ...
+              $FACTORY.newDocumentBuilder();
+          - pattern-not: |
+              $FACTORY = DocumentBuilderFactory.newInstance();
+              ...
+              $FACTORY.setFeature("=~/disallow-doctype-decl/", true);
+              ...
+              $FACTORY.newDocumentBuilder();
+          - pattern-not: |
+              $FACTORY = DocumentBuilderFactory.newInstance();
+              ...
+              $FACTORY.setAttribute($QUALIFIER.ACCESS_EXTERNAL_DTD, "");
+              ...
+              $FACTORY.newDocumentBuilder();
+      - patterns:
+          - pattern: |
+              $FACTORY = SAXParserFactory.newInstance();
+              ...
+              $FACTORY.newSAXParser();
+          - pattern-not: |
+              $FACTORY = SAXParserFactory.newInstance();
+              ...
+              $FACTORY.setFeature("=~/disallow-doctype-decl/", true);
+              ...
+              $FACTORY.newSAXParser();
+          # The parser-level route. SAXParserFactory has neither setAttribute nor
+          # setProperty, so this is the only SAX way to ACCESS_EXTERNAL_DTD, and
+          # it is necessarily reached AFTER newSAXParser() on a different object
+          # — hence a method-scoped clause here rather than a `pattern-not`. The
+          # receiver is still bound: $PARSER is the object newSAXParser()
+          # returned, and $FACTORY unifies with the positive pattern. KNOWN
+          # LIMITATION, and the one place the rule is deliberately order-free:
+          # this clause is ordered against the creation call only, so a
+          # setProperty after the parse call — equally useless — is not reported.
+          # The positive pattern ends at newSAXParser() rather than at the parse.
+          - pattern-not-inside: |
+              $RET $METHOD(...) {
+                ...
+                $PARSER = $FACTORY.newSAXParser();
+                ...
+                $PARSER.setProperty($QUALIFIER.ACCESS_EXTERNAL_DTD, "");
+                ...
+              }
       - patterns:
           - pattern: |
               $FACTORY = XMLInputFactory.newInstance();
               ...
               $FACTORY.createXMLStreamReader(...);
-          - pattern-not-regex: 'IS_SUPPORTING_EXTERNAL_ENTITIES|SUPPORT_DTD'
+          # Either property alone clears the StAX branch, and the value is part
+          # of the pattern for the same reason it is above.
+          #
+          # XMLInputFactory.setProperty takes an Object, so the boxed spelling is
+          # ordinary here and is accepted alongside the literal: semgrep does not
+          # resolve a JDK field like Boolean.FALSE to a literal the way it
+          # resolves a `static final String` declared in the file, so each
+          # spelling needs its own clause. KNOWN LIMITATION: the STRING "false"
+          # is deliberately NOT accepted. Some implementations coerce it, the
+          # StAX specification types these properties as Boolean, and a value
+          # that only some parsers honour is not proof of hardening — the same
+          # reason `ACCESS_EXTERNAL_DTD, "file"` does not clear the rule.
+          - pattern-not: |
+              $FACTORY = XMLInputFactory.newInstance();
+              ...
+              $FACTORY.setProperty($QUALIFIER.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+              ...
+              $FACTORY.createXMLStreamReader(...);
+          - pattern-not: |
+              $FACTORY = XMLInputFactory.newInstance();
+              ...
+              $FACTORY.setProperty($QUALIFIER.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
+              ...
+              $FACTORY.createXMLStreamReader(...);
+          - pattern-not: |
+              $FACTORY = XMLInputFactory.newInstance();
+              ...
+              $FACTORY.setProperty($QUALIFIER.SUPPORT_DTD, false);
+              ...
+              $FACTORY.createXMLStreamReader(...);
+          - pattern-not: |
+              $FACTORY = XMLInputFactory.newInstance();
+              ...
+              $FACTORY.setProperty($QUALIFIER.SUPPORT_DTD, Boolean.FALSE);
+              ...
+              $FACTORY.createXMLStreamReader(...);

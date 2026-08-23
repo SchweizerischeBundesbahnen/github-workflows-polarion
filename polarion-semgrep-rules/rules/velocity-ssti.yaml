@@ -38,17 +38,117 @@ rules:
       references:
         - https://www.sentinelone.com/vulnerability-database/cve-2020-13936/
     pattern-either:
+      # The construction site itself is the match, so the finding lands on the
+      # `new VelocityEngine(...)` line and every shape is reached: a bare
+      # statement, `return new VelocityEngine(...)`, a field initializer and a
+      # construction inside a constructor. The suppression is a `pattern-not-inside`
+      # rather than a `pattern-not-regex`, because a regex is applied to the
+      # matched region as TEXT: a comment naming SecureUberspector suppressed a
+      # real finding, and the rule pack's own vulnerable fixture was silenced
+      # that way. Matching the configuring call structurally cannot be fooled by
+      # a comment.
+      #
+      # A — construction inside a method body. The suppression is scoped to that
+      # same method, so a sibling method that hardens its own engine does not
+      # clear this one. KNOWN LIMITATION, and the cost of that scoping: only
+      # hardening in the SAME method clears a method-local construction, so
+      # `new VelocityEngine(secureProperties())` in a builder method is reported
+      # although the helper hardens. The identical delegation in a field
+      # initializer is cleared, because that takes the class-scoped branch B.
       - patterns:
-          # Match the enclosing method so a `setProperty(..., "...SecureUberspector")`
-          # call in the same method clears the finding. KNOWN LIMITATION:
-          # if SecureUberspector is referenced via a class-scope constant
-          # outside the method, this rule still fires (FP). Move the
-          # constant inline or use String.intern() in the method to
-          # suppress; alternatively triage as documented FP.
-          - pattern: |
+          - pattern: new VelocityEngine(...)
+          - pattern-inside: |
               $RET $METHOD(...) {
                 ...
-                new VelocityEngine(...);
+              }
+          - pattern-not-inside: |
+              $RET $METHOD(...) {
+                ...
+                $CALL(..., "=~/SecureUberspector/", ...);
                 ...
               }
-          - pattern-not-regex: 'SecureUberspector'
+          - pattern-not-inside: |
+              $RET $METHOD(...) {
+                ...
+                $CALL(..., <... SecureUberspector.class ...>, ...);
+                ...
+              }
+      # B — construction outside any method body: a field initializer, a static
+      # initializer, or a constructor. There is no enclosing method for the
+      # suppression to scope to, so it scopes to the class. KNOWN LIMITATION:
+      # any hardening anywhere in the class clears these, which is the price of
+      # reaching the field-initializer shape at all. Constant propagation covers
+      # the class-scope `static final String` spelling of the FQCN.
+      #
+      # Both spellings are repeated for each of the three members, because the
+      # two are separate patterns and a member clause carrying only the string
+      # literal reports hardened code: `SecureUberspector.class.getName()` in a
+      # constructor is not a string literal and constant propagation does not
+      # make it one. `class $CLASS { ... }` matches an `enum` declaration too,
+      # so an enum singleton holding an engine is covered by these clauses.
+      - patterns:
+          - pattern: new VelocityEngine(...)
+          - pattern-not-inside: |
+              $RET $METHOD(...) {
+                ...
+              }
+          - pattern-not-inside: |
+              class $CLASS {
+                ...
+                $RET $METHOD(...) {
+                  ...
+                  $CALL(..., "=~/SecureUberspector/", ...);
+                  ...
+                }
+                ...
+              }
+          - pattern-not-inside: |
+              class $CLASS {
+                ...
+                $RET $METHOD(...) {
+                  ...
+                  $CALL(..., <... SecureUberspector.class ...>, ...);
+                  ...
+                }
+                ...
+              }
+          - pattern-not-inside: |
+              class $CLASS {
+                ...
+                $CLASS(...) {
+                  ...
+                  $CALL(..., "=~/SecureUberspector/", ...);
+                  ...
+                }
+                ...
+              }
+          - pattern-not-inside: |
+              class $CLASS {
+                ...
+                $CLASS(...) {
+                  ...
+                  $CALL(..., <... SecureUberspector.class ...>, ...);
+                  ...
+                }
+                ...
+              }
+          - pattern-not-inside: |
+              class $CLASS {
+                ...
+                static {
+                  ...
+                  $CALL(..., "=~/SecureUberspector/", ...);
+                  ...
+                }
+                ...
+              }
+          - pattern-not-inside: |
+              class $CLASS {
+                ...
+                static {
+                  ...
+                  $CALL(..., <... SecureUberspector.class ...>, ...);
+                  ...
+                }
+                ...
+              }

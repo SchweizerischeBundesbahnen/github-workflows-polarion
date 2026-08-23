@@ -54,4 +54,50 @@ public class XxeVulnerable {
         DocumentBuilder builder = factory.newDocumentBuilder();
         return builder.parse(new InputSource(new StringReader(xml)));
     }
+
+    // A comment naming the hardening feature must not suppress the finding. The
+    // earlier suppression was a `pattern-not-regex` over the matched region,
+    // which matched comment text as readily as code.
+    // ruleid: polarion-xxe-unsafe-parser
+    public Document parseDocCommentOnly(String xml) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        // TODO: set disallow-doctype-decl here before shipping
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        return builder.parse(new InputSource(new StringReader(xml)));
+    }
+
+    // Hardening one factory must not clear another in the same method: the
+    // suppression is tied to the receiver the positive pattern binds.
+    public void parseTwoFactories(String hardened, String exposed) throws Exception {
+        DocumentBuilderFactory safeFactory = DocumentBuilderFactory.newInstance();
+        safeFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        safeFactory.newDocumentBuilder().parse(new InputSource(new StringReader(hardened)));
+
+        // ruleid: polarion-xxe-unsafe-parser
+        DocumentBuilderFactory exposedFactory = DocumentBuilderFactory.newInstance();
+        exposedFactory.newDocumentBuilder().parse(new InputSource(new StringReader(exposed)));
+    }
+
+    // The feature is set after the builder exists, so it does not apply to that
+    // builder. Hardening has to sit between newInstance() and the creation call.
+    // ruleid: polarion-xxe-unsafe-parser
+    public Document parseDocHardenedTooLate(String xml) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        return builder.parse(new InputSource(new StringReader(xml)));
+    }
+
+    // The StAX properties are typed Boolean; a string value is coerced by some
+    // implementations only, so it is not accepted as proof of hardening — the
+    // same reason ACCESS_EXTERNAL_DTD set to "file" does not clear the rule.
+    // ruleid: polarion-xxe-unsafe-parser
+    public void parseStaxStringFalse(String xml) throws Exception {
+        XMLInputFactory factory = XMLInputFactory.newInstance();
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, "false");
+        XMLStreamReader reader = factory.createXMLStreamReader(new StringReader(xml));
+        while (reader.hasNext()) {
+            reader.next();
+        }
+    }
 }

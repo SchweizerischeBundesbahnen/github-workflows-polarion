@@ -58,21 +58,28 @@ The rules were tuned to a locked-in baseline of **13 findings** on 2026-05-06,
 at the SHAs recorded then: api-extender 1, generic 2, pdf-exporter 0,
 docx-exporter 0, diff-tool 10.
 
-Re-measured against current `main` on 2026-08-19, semgrep 1.172.0:
+Re-measured against current `main` on 2026-08-22, semgrep 1.172.0:
 
 | Target | `main` SHA | Findings |
 |---|---|---|
-| api-extender | 6d7f5a7 | 1 |
-| generic | 2d48baa | 2 |
-| pdf-exporter | 28efc27 | 0 |
-| docx-exporter | 147532a | 0 |
-| diff-tool | 77ae24c | 15 |
+| api-extender | ede37c6 | 1 |
+| generic | dbf2f6e | 2 |
+| pdf-exporter | ce31ac1 | 0 |
+| docx-exporter | f8d956f | 0 |
+| diff-tool | 079d9f7 | 15 |
 
 18 in total. Every one is `polarion-transaction-no-permission-check` at INFO;
 diff-tool gained five as new transactions were added since May. The other seven
 rules fire nowhere on the corpus and act as regression guards on new code. Treat
 that as the point of the pack in CI today: it is not a backlog of findings to
 clear.
+
+The same five trees were measured with the rule pack as it stood before
+`polarion-velocity-ssti` and `polarion-xxe-unsafe-parser` were rewritten to match
+hardening structurally, and the result is identical target by target and rule by
+rule. Widening those two rules to reach four more shapes introduced no finding on
+any real target, which is the only evidence that matters for whether the widening
+is safe to ship: their fixtures grew from 1 and 5 asserted cases to 5 and 9.
 
 ## Known rule gaps
 
@@ -99,28 +106,88 @@ repeated in the header of the rule it applies to.
   the request's actual user, not as an elevated subject. Extension-level
   `checkPermission` is therefore defense-in-depth. The rule still catches
   mutations made outside a platform API — raw JDBC, direct file IO, reflection.
-- **`polarion-velocity-ssti` matches at method scope, in both directions.** A
-  `SecureUberspector` configured through class-scope constants is invisible to
-  the method-level `pattern-not-regex`, so that shape produces a false positive.
-  In the other direction the rule requires `new VelocityEngine(...)` as a bare
-  statement inside a method declaration, so three shapes are missed silently: a
-  field initializer (`private static final VelocityEngine ENGINE = new
-  VelocityEngine();`), a construction inside a constructor, which has no return
-  type for the pattern to bind, and `return new VelocityEngine(props);`. The
-  last of these is annotated `known-miss:` in the vulnerable fixture. Widening
-  the pattern is not a one-line change — adding a `pattern-regex` narrows the
-  match region so the `SecureUberspector` suppression stops working — so it is
-  tracked separately rather than bundled here.
-- **`polarion-xxe-unsafe-parser` accepts exactly two hardening forms.**
-  `disallow-doctype-decl`, and `ACCESS_EXTERNAL_DTD` set to an empty string. The
-  empty value is part of the check: `ACCESS_EXTERNAL_DTD, "file"` still resolves
+- **`polarion-velocity-ssti` suppression is class-scoped wherever the
+  construction has no enclosing method.** The match is `new VelocityEngine(...)`
+  itself, so all four shapes are reached — a bare statement, `return new
+  VelocityEngine(...)`, a field initializer, and a construction inside a
+  constructor — and the finding lands on the construction line rather than on the
+  enclosing declaration. Where the construction sits inside a method the
+  suppression is scoped to that method, so a hardened sibling does not clear an
+  unhardened one; where it does not, the only scope available is the class, and
+  any hardening anywhere in the class clears it. Accepted spellings of the
+  hardening: the fully qualified class name as a string literal, directly or
+  through a `static final String` constant that semgrep propagates, and
+  `SecureUberspector.class`. Both spellings are accepted from a method, a
+  constructor and a static initializer alike, and `class $CLASS { ... }` matches
+  an `enum` declaration, so an enum singleton holding an engine is covered.
+  Hardening expressed any other way is a false positive, and so is hardening
+  placed outside the scope the branch applies to — which for a method-local
+  construction means anywhere but that method. `new
+  VelocityEngine(secureProperties())` in a builder method is therefore reported
+  although the helper hardens, while the identical delegation in a field
+  initializer is cleared by the class-scoped branch. That is the price of not
+  letting a hardened method clear an unhardened sibling, and it predates this
+  wording rather than being introduced by it.
+- **`polarion-xxe-unsafe-parser` accepts exactly two hardening forms, on the
+  receiver the finding is about.** `disallow-doctype-decl`, and
+  `ACCESS_EXTERNAL_DTD` set to an empty string — on the factory through
+  `setAttribute` before the parser is created, or on the parser through
+  `setProperty` after it, which is the only SAX route to that property because
+  `SAXParserFactory` has neither method. The two routes carry opposite order
+  disciplines and both are enforced: FACTORY-level hardening applied once the
+  builder or parser already exists does not clear the rule, because it cannot
+  affect it, and neither does hardening a sibling factory in the same method.
+  The parser-level route is ordered against the creation call only, so a
+  `setProperty` placed after the `parse` call — where it is equally useless — is
+  not reported. The positive pattern ends at `newSAXParser()` rather than at the
+  parse, and that shape is contrived enough not to be worth extending it. The
+  empty
+  value is part of the check: `ACCESS_EXTERNAL_DTD, "file"` still resolves
   `file://` external entities, so matching the constant name alone would clear
   the rule on code that is still exposed. `ACCESS_EXTERNAL_SCHEMA` on its own
   does not clear it either, because restricting schema resolution addresses
   neither DOCTYPE processing nor external general entities. Nor does
   `FEATURE_SECURE_PROCESSING`: OWASP records that it "may not always mitigate
   entity expansion" and treats it as supplementary. Both negative cases are
-  pinned in the vulnerable fixture.
+  pinned in the vulnerable fixture, as are the sibling-factory and
+  hardened-too-late shapes. On the StAX branch the boxed `Boolean.FALSE` is
+  accepted alongside the literal `false`, because `setProperty` takes an
+  `Object`; the string `"false"` is not, since the specification types these
+  properties as Boolean and a value only some implementations coerce is not proof
+  of hardening. Rejected earlier and worth not retrying: widening the SAX
+  positive pattern past the factory call, which makes the region overlap itself
+  and produces duplicate findings on unhardened code without clearing the
+  hardened one — the parser-level clause exists because of that.
+
+  The limitation is the scope: every clause requires the configuring call in the
+  same METHOD as the creation, so hardening delegated to a helper method or
+  performed in a constructor does not clear the rule. Block nesting inside that
+  method is fine at any depth — the statement ellipsis descends into a `try`,
+  `if` or loop body, which matters because the OWASP cheat sheet's own DOM
+  example wraps `setFeature` in `try`/`catch`, and both depths are pinned in the
+  fixed fixture. It descends into a lambda body as well. The one boundary it does
+  not cross is an anonymous class's method body, so hardening performed there
+  still reports, which is a false positive.
+
+  That descent is unconditional, and it cuts the other way. Hardening behind an
+  `if` clears the rule although the branch not taken reaches the parser
+  unhardened; hardening in a lambda body clears it without the lambda ever being
+  invoked, because no clause matches the call that would run it, so there the
+  hardening need not be on any executed path at all. Semgrep matches statements,
+  not paths, so both are limitations of the analysis rather than of these
+  clauses. Both are real exploitable configurations the rule stays silent on, and
+  the lambda is the worse of the two.
+- **Both rules above match the configuring call structurally, not as text.** A
+  `pattern-not-regex` is applied to the matched region as TEXT, which cost a
+  false positive and a false negative at once and is worth stating explicitly
+  because the failure is silent in both directions. Measured on semgrep 1.172.0:
+  hardened SAX code was reported at ERROR because the matched region ended at
+  `newSAXParser()` and the `parser.setProperty(...)` call sat past it; and a
+  comment naming `SecureUberspector` or `disallow-doctype-decl` inside the region
+  cleared the rule outright, which is how a genuinely vulnerable case in this
+  pack's own fixture came to be recorded as a shape the pattern could not reach.
+  Widening a region-scoped regex is not the fix — it moves the region — so both
+  rules express hardening as a `pattern-not-inside` over the enclosing scope.
 - **`polarion-weasyprint-pre-68` cannot match a specifier split across
   lines.** Two forms are out of reach, both because TOML spreads them over more
   than one line and every alternative is single-line: a `poetry.lock` entry
@@ -133,14 +200,6 @@ repeated in the header of the rule it applies to.
   casing), the assignment form (`weasyprint = "==67.0"`) and the inline-table
   form (`weasyprint = {version = "^67.0", extras = [...]}`) — the last two being
   the syntaxes Pipfile and the poetry dependency table use.
-- **The `ACCESS_EXTERNAL_DTD` form clears DOM only, not SAX.**
-  `SAXParserFactory` has no `setAttribute`, so the SAX route to that hardening is
-  `parser.setProperty(...)` after `newSAXParser()`, which falls outside the
-  matched region — SAX code hardened that way is reported at ERROR. Widening the
-  SAX pattern past the factory call was tried and made it worse: the region
-  overlaps itself, producing duplicate findings on unhardened code without
-  clearing the hardened case. `disallow-doctype-decl` is unaffected on both
-  branches, because `factory.setFeature(...)` precedes `newSAXParser()`.
 - **`polarion-workflow-function-no-authz` cannot read `workflow.xml`, and does
   not require a mutation.** Whether the transition itself is role-restricted is
   outside the rule's reach. The precisely-typed
