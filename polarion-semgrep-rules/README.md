@@ -29,6 +29,14 @@ SEMGREP="uvx semgrep==$(cat polarion-semgrep-rules/SEMGREP_VERSION)" \
 
 Re-measure the corpus with `POLARION_TARGETS_DIR=<dir> bash polarion-semgrep-rules/tests/measure_corpus.sh`, which needs local clones and so cannot run in CI.
 
+Probe a rule against arbitrary code — a shape a review comment describes, a hardening spelling no
+fixture pins yet — with `bash polarion-semgrep-rules/tests/probe_rule.sh <rule|rules-dir>
+<target>…`. It answers what a rule does to one file, which is the question a rule change raises
+before a fixture exists for it. It refuses to print a finding count when semgrep exited non-zero,
+and prints the scanned-file count beside the finding count, because a target semgrep never read —
+an extension that does not map to the rule's language, a path on the built-in `.semgrepignore` —
+otherwise reports 0 findings and exit 0 just like a rule that matched nothing.
+
 `jq` is required. A rule missing either fixture fails the suite rather than
 being skipped, and the number of rules tested is asserted against the number of
 rule files, so a suite that checked nothing cannot report success. The
@@ -127,7 +135,10 @@ repeated in the header of the rule it applies to.
   although the helper hardens, while the identical delegation in a field
   initializer is cleared by the class-scoped branch. That is the price of not
   letting a hardened method clear an unhardened sibling, and it predates this
-  wording rather than being introduced by it.
+  wording rather than being introduced by it. Both branches share the
+  path-insensitivity recorded for `polarion-xxe-unsafe-parser` below: hardening
+  behind an `if`, or written in a lambda that is never invoked, clears the rule
+  although nothing is applied on the path that reaches the constructor.
 - **`polarion-xxe-unsafe-parser` accepts exactly two hardening forms, on the
   receiver the finding is about.** `disallow-doctype-decl`, and
   `ACCESS_EXTERNAL_DTD` set to an empty string — on the factory through
