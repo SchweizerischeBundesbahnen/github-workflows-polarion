@@ -80,7 +80,8 @@ for target in "$@"; do
 
     printf '%s' "${json}" | jq -r '.errors[]? | "  ERROR \(.level): \((.message // "") | split("\n")[0])"'
     # A count is only an answer about code semgrep actually read, so print the
-    # scanned-file count beside it and say so outright when it is zero.
+    # scanned-file count beside it, and treat a run that read nothing the way the
+    # exit-7 branch treats a rule that never loaded: say so, and fail.
     scanned=$(printf '%s' "${json}" | jq '.paths.scanned | length')
     printf 'count=%s (scanned %s file(s))\n' \
         "$(printf '%s' "${json}" | jq '.results | length')" "${scanned}"
@@ -88,6 +89,7 @@ for target in "$@"; do
         printf '  NOTE: semgrep scanned nothing here — the extension does not map to the\n'
         printf '        rule language, or the path is skipped by .semgrepignore. The count\n'
         printf '        above says nothing about this code.\n'
+        status=1
     fi
     printf '%s' "${json}" | jq -r '.results[] | "  \(.path):\(.start.line)  \(.check_id)"'
 done
