@@ -447,5 +447,5 @@ jobs:
           # permission allowlist, so a tool here only is both started and permitted.
           # They are kept identical so a reader can tell which list is authoritative.
           claude_args: >-
-            --max-turns 40 --model opus --effort high
+            --max-turns 50 --model opus --effort high
             --allowedTools "Read,Grep,Glob,BatchTool,mcp__github_inline_comment__create_inline_comment,Bash(gh pr review:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*)"
