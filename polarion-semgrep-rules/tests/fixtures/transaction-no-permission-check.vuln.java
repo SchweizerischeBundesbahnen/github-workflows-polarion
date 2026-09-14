@@ -183,6 +183,29 @@ public class TransactionVulnerable {
         });
     }
 
+    // A braceless positive guard covers its own statement only.
+    public void bracelessGuardThenWrite(String user, File file, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (securityService.hasPermission(user, "MODIFY", resource)) System.err.println("allowed");
+            // ruleid: polarion-transaction-no-permission-check
+            file.delete();
+            return null;
+        });
+    }
+
+    // The accepted exception types are matched by simple name, so an inline
+    // fully qualified name does not clear the rule. A documented false positive.
+    public void fullyQualifiedForbidden(String user, File file, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (!securityService.hasPermission(user, "MODIFY", resource)) {
+                throw new jakarta.ws.rs.ForbiddenException("not allowed");
+            }
+            // ruleid: polarion-transaction-no-permission-check
+            file.delete();
+            return null;
+        });
+    }
+
     // The write happens precisely when permission is denied. The rethrow in
     // the nested catch must not make the guard look terminating.
     public void invertedGuardWrites(String user, Path path, Object resource) {

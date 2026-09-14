@@ -9,6 +9,7 @@ import com.polarion.platform.service.repository.IRepositoryService;
 import com.polarion.subterra.base.location.ILocation;
 import jakarta.ws.rs.ForbiddenException;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
@@ -127,6 +128,39 @@ public class TransactionFixed {
                 throw new IllegalStateException(e);
             }
             return path;
+        });
+    }
+
+    // ok: polarion-transaction-no-permission-check
+    public void guardReturnsValueWithoutBraces(String user, File file, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (!securityService.hasPermission(user, "MODIFY", resource)) return null;
+            file.delete();
+            return null;
+        });
+    }
+
+    // ok: polarion-transaction-no-permission-check
+    public void guardReturnsWithoutBraces(String user, File file, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            runNow(() -> {
+                if (!securityService.hasPermission(user, "MODIFY", resource)) return;
+                file.delete();
+            });
+            return null;
+        });
+    }
+
+    private void runNow(Runnable runnable) {
+        runnable.run();
+    }
+
+    // The braced positive clause also reaches a braceless body.
+    // ok: polarion-transaction-no-permission-check
+    public void guardedStatementWithoutBraces(String user, File file, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (securityService.hasPermission(user, "MODIFY", resource)) file.delete();
+            return null;
         });
     }
 

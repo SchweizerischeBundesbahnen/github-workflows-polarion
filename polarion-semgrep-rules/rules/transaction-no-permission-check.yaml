@@ -164,7 +164,7 @@ rules:
       #     not clear the rule. Pinned as a reported case. The accepted types
       #     are matched by simple name, as an import leaves them; an inline
       #     fully qualified `new jakarta.ws.rs.ForbiddenException(...)` does
-      #     not clear it either.
+      #     not clear it either, also pinned as a reported case.
       #   - The positive clause covers the whole if statement, so a write in
       #     its `else` branch is cleared.
       #   - The terminating clause covers its own body as well as what follows,
@@ -205,6 +205,16 @@ rules:
           ...
       - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...)) { ... return $VALUE; }
+          ...
+      # A braced negated clause does not reach a braceless branch, so each
+      # negated clause comes in both forms. The braced positive clause below
+      # does reach a braceless body, so one form is enough there. Both
+      # measured on semgrep 1.172.0 and pinned in the fixed fixture.
+      - pattern-not-inside: |
+          if (!$SECURITY.hasPermission(...)) return;
+          ...
+      - pattern-not-inside: |
+          if (!$SECURITY.hasPermission(...)) return $VALUE;
           ...
       - pattern-not-inside: |
           if ($SECURITY.hasPermission(...)) { ... }
