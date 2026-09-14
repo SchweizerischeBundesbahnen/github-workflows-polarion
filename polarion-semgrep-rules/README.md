@@ -51,7 +51,7 @@ passing on a bare `> 0`. A case the rule is known not to reach carries
 |---|---|---|
 | `polarion-rest-no-authz-check` | WARNING | A REST controller method that changes state without `@Secured` or a per-endpoint permission check. Suppressed for classes whose `@Path` starts with `/internal`. |
 | `polarion-get-with-write-transaction` | ERROR | A `@GET` method that opens a write transaction. |
-| `polarion-transaction-no-permission-check` | WARNING | A call inside a write transaction that changes state outside a platform API (JDBC update, `java.io` / `java.nio.file` / commons-io write, `setAccessible(true)`), with no `checkPermission` / `hasPermission` call before it. |
+| `polarion-transaction-no-permission-check` | WARNING | A call that changes state outside a platform API (JDBC update, `java.io` / `java.nio.file` / commons-io write, `setAccessible(true)`) inside a write transaction, or in a same-file method the transaction calls, with no permission check before it. |
 | `polarion-elevated-privileges` | WARNING | `doAsSystemUser(...)`, `getSystemUserSubject()` or `loginUserFromVault(...)`: code that runs with rights other than the request user's. |
 | `polarion-velocity-ssti` | ERROR | `VelocityEngine` constructed without `SecureUberspector`, which exposes Java reflection to template authors. |
 | `polarion-xxe-unsafe-parser` | ERROR | `DocumentBuilderFactory` / `SAXParserFactory` / `XMLInputFactory` created without `disallow-doctype-decl` or an emptied `ACCESS_EXTERNAL_DTD`. |
@@ -110,7 +110,8 @@ in diff-tool: `DocumentCopyService` sets a comment author as the system user, an
 `ExecutionQueueSettings` reads global settings as the system user. Both are the
 review the rule exists to prompt. The two changed rules were also run over the 17
 other local `ch.sbb.polarion.extension.*` repositories with Java sources, with 0
-findings.
+findings. Both numbers held after the rule was extended in review to one-level
+helpers, chained JDBC statements and guard polarity.
 
 ## Known rule gaps
 
@@ -144,17 +145,28 @@ repeated in the header of the rule it applies to.
   without an explicit check, at INFO, which on the corpus was 18 findings and no
   defect.
 
-  Three shapes are out of reach. A bypass in a helper method that the
-  transaction lambda calls is not reported, because semgrep does not follow
-  calls. A chained `connection.prepareStatement(sql).execute()` is not reported,
-  because its receiver has no declared type. Both are annotated `known-miss:` in
-  the vulnerable fixture. A bypass in a read-only transaction or outside any
-  transaction is not reported either: file IO outside a write transaction is
-  routine on the corpus (export logs, temporary files). The permission check is
-  matched as a `checkPermission(...)` statement or a `hasPermission(...)`
-  condition placed before the change, so an extension helper with another name
-  (`checkPermissions()`, `isModificationAllowed()`) does not clear the rule, and
-  a guard whose branch does not stop the change does.
+  Calls are followed one level into a method of the same file, spelled
+  `helper(...)` or `this.helper(...)`, and the finding lands in the helper. A
+  helper two levels down, a method on another object and a method reference are
+  not followed, because semgrep reads one file at a time. A chained
+  `connection.prepareStatement(sql).execute()` is reached through the
+  `Connection` call that creates the statement. A bypass in a read-only
+  transaction or outside any transaction is not reported: file IO outside a
+  write transaction is routine on the corpus (export logs, temporary files).
+
+  The permission check is a `checkPermission(...)` statement before the change,
+  a positive `if (hasPermission(...))` around it, or a negated
+  `if (!hasPermission(...))` before it that returns or throws
+  `PermissionDeniedException`, `ForbiddenException`, `NotAuthorizedException` or
+  `SecurityException`, spelled by simple name. The thrown type is named because a
+  bare `throw` matched a rethrow in a `catch` nested in the guard body, which
+  cleared a write made precisely when permission is denied. What remains out of
+  reach, each pinned in the vulnerable fixture: a check in the caller does not
+  clear a finding in its helper; an extension helper with another name
+  (`checkPermissions()`) and a guard throwing another type do not clear the rule;
+  a write in the `else` of a positive guard, a write inside a terminating guard,
+  and a guard that throws on one path only are cleared. Semgrep matches
+  statements, not paths.
 - **`polarion-elevated-privileges` reports the elevation, not its effect.**
   `doAsSystemUser(...)`, `getSystemUserSubject()` and `loginUserFromVault(...)`
   are matched wherever they appear, whether the block reads or writes, because a

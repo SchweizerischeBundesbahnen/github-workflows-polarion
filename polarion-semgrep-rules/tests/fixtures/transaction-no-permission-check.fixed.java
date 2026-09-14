@@ -7,10 +7,12 @@ import com.polarion.platform.security.PermissionDeniedException;
 import com.polarion.platform.service.repository.IRepositoryConnection;
 import com.polarion.platform.service.repository.IRepositoryService;
 import com.polarion.subterra.base.location.ILocation;
+import jakarta.ws.rs.ForbiddenException;
 import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
 
 public class TransactionFixed {
 
@@ -86,6 +88,49 @@ public class TransactionFixed {
     }
 
     // ok: polarion-transaction-no-permission-check
+    public void guardClauseForbidden(String user, Path path, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (!securityService.hasPermission(user, "MODIFY", resource)) {
+                throw new ForbiddenException("not allowed");
+            }
+            try {
+                Files.delete(path);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
+    // ok: polarion-transaction-no-permission-check
+    public void guardClauseWithoutBraces(String user, Path path, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (!securityService.hasPermission(user, "MODIFY", resource)) throw new PermissionDeniedException("not allowed");
+            try {
+                Files.delete(path);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
+    // ok: polarion-transaction-no-permission-check
+    public Object guardClauseReturns(String user, Path path, Object resource) {
+        return TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (!securityService.hasPermission(user, "MODIFY", resource)) {
+                return null;
+            }
+            try {
+                Files.delete(path);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return path;
+        });
+    }
+
+    // ok: polarion-transaction-no-permission-check
     public void guardedBranch(String user, Path path, Object resource) {
         TransactionalExecutor.executeInWriteTransaction(transaction -> {
             if (securityService.hasPermission(user, "MODIFY", resource)) {
@@ -116,5 +161,33 @@ public class TransactionFixed {
     // ok: polarion-transaction-no-permission-check
     public void writeOutsideTransaction(Path path, String content) throws Exception {
         Files.writeString(path, content);
+    }
+
+    // The helper branch follows write transactions only.
+    // ok: polarion-transaction-no-permission-check
+    public String helperFromReadOnlyTransaction(Path path) {
+        return TransactionalExecutor.executeInReadOnlyTransaction(transaction -> cleanTemporary(path));
+    }
+
+    private String cleanTemporary(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (Exception e) {
+            // ignored
+        }
+        return null;
+    }
+
+    // A chained query is a read.
+    // ok: polarion-transaction-no-permission-check
+    public void jdbcChainedQuery(Connection connection, String sql) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            try {
+                connection.prepareStatement(sql).executeQuery();
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
     }
 }

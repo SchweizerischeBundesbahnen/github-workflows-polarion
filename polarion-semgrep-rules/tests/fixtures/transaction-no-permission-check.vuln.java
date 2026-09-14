@@ -1,7 +1,10 @@
 package ch.sbb.polarion.extension.example;
 
+import static com.polarion.alm.shared.api.transaction.TransactionalExecutor.executeInWriteTransaction;
+
 import com.polarion.alm.shared.api.transaction.TransactionalExecutor;
 import com.polarion.platform.security.ISecurityService;
+import com.polarion.platform.security.PermissionDeniedException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.lang.reflect.Field;
@@ -149,10 +152,126 @@ public class TransactionVulnerable {
         });
     }
 
-    // semgrep does not follow the call into the helper.
+    // semgrep resolves the static import, so the bare call is reached.
+    public void staticImport(Path path) {
+        executeInWriteTransaction(transaction -> {
+            try {
+                // ruleid: polarion-transaction-no-permission-check
+                Files.delete(path);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
+    // A guard that throws a non-permission type does not clear the rule. A
+    // documented false positive: the clause names the thrown type, because a
+    // bare `throw` matched a rethrow nested in a catch.
+    public void guardThrowsOtherType(String user, Path path, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (!securityService.hasPermission(user, "MODIFY", resource)) {
+                throw new IllegalStateException("not allowed");
+            }
+            try {
+                // ruleid: polarion-transaction-no-permission-check
+                Files.delete(path);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
+    // The write happens precisely when permission is denied. The rethrow in
+    // the nested catch must not make the guard look terminating.
+    public void invertedGuardWrites(String user, Path path, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (!securityService.hasPermission(user, "MODIFY", resource)) {
+                try {
+                    // ruleid: polarion-transaction-no-permission-check
+                    Files.delete(path);
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+            return null;
+        });
+    }
+
+    // A guard whose branch does not stop execution protects nothing.
+    public void guardDoesNotStop(String user, Path path, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (!securityService.hasPermission(user, "MODIFY", resource)) {
+                System.err.println("denied");
+            }
+            try {
+                // ruleid: polarion-transaction-no-permission-check
+                Files.delete(path);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
+    // The positive guard clause covers the whole if statement, else included.
+    public void writeInElseOfGuard(String user, Path path, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (securityService.hasPermission(user, "MODIFY", resource)) {
+                System.err.println("allowed");
+            } else {
+                try {
+                    // known-miss: polarion-transaction-no-permission-check
+                    Files.delete(path);
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+            return null;
+        });
+    }
+
+    // The terminating guard clause covers its own body as well as what follows.
+    public void writeInsideTerminatingGuard(String user, Path path, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (!securityService.hasPermission(user, "MODIFY", resource)) {
+                try {
+                    // known-miss: polarion-transaction-no-permission-check
+                    Files.delete(path);
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+                throw new PermissionDeniedException("not allowed");
+            }
+            return null;
+        });
+    }
+
+    // The statement ellipsis descends into the nested if, so a throw on one
+    // path only is taken as a terminating guard. Semgrep matches statements,
+    // not paths.
+    public void throwOnOnePathOnly(String user, Path path, Object resource, boolean strict) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (!securityService.hasPermission(user, "MODIFY", resource)) {
+                if (strict) {
+                    throw new PermissionDeniedException("not allowed");
+                }
+            }
+            try {
+                // known-miss: polarion-transaction-no-permission-check
+                Files.delete(path);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
+    // A method of the same class that the lambda calls is followed one level.
+    // The finding lands in the helper.
     public void bypassInHelper(Path path) {
         TransactionalExecutor.executeInWriteTransaction(transaction -> {
-            // known-miss: polarion-transaction-no-permission-check
             deleteQuietly(path);
             return null;
         });
@@ -160,17 +279,97 @@ public class TransactionVulnerable {
 
     private void deleteQuietly(Path path) {
         try {
+            // ruleid: polarion-transaction-no-permission-check
             Files.deleteIfExists(path);
         } catch (Exception e) {
             // ignored
         }
     }
 
-    // A chained statement has no declared type for `execute(...)` to bind.
+    public String bypassInThisHelper(Path path) {
+        return TransactionalExecutor.executeInWriteTransaction(transaction -> this.writeMarker(path));
+    }
+
+    private String writeMarker(Path path) {
+        try {
+            // ruleid: polarion-transaction-no-permission-check
+            Files.writeString(path, "marker");
+        } catch (Exception e) {
+            // ignored
+        }
+        return "ok";
+    }
+
+    // The check is looked up from the finding, so a check in the caller does
+    // not clear a finding in the helper. A documented false positive.
+    public void helperAfterCallerCheck(String user, Path path, Object resource) {
+        securityService.checkPermission(user, "MODIFY", resource);
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            removeChecked(path);
+            return null;
+        });
+    }
+
+    private void removeChecked(Path path) {
+        try {
+            // ruleid: polarion-transaction-no-permission-check
+            Files.delete(path);
+        } catch (Exception e) {
+            // ignored
+        }
+    }
+
+    // Only one level of call is followed.
+    public void bypassTwoLevelsDown(Path path) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            firstLevel(path);
+            return null;
+        });
+    }
+
+    private void firstLevel(Path path) {
+        secondLevel(path);
+    }
+
+    private void secondLevel(Path path) {
+        try {
+            // known-miss: polarion-transaction-no-permission-check
+            Files.delete(path);
+        } catch (Exception e) {
+            // ignored
+        }
+    }
+
+    // A method on another object usually lives in another file, which semgrep
+    // does not read.
+    public void bypassInOtherObject(TemporaryStore store, Path path) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            // known-miss: polarion-transaction-no-permission-check
+            store.remove(path);
+            return null;
+        });
+    }
+
+    // A method reference is not followed.
+    public void bypassInMethodReference() {
+        TransactionalExecutor.executeInWriteTransaction(this::purge);
+    }
+
+    private Object purge(Object transaction) {
+        try {
+            // known-miss: polarion-transaction-no-permission-check
+            Files.delete(Path.of("purge"));
+        } catch (Exception e) {
+            // ignored
+        }
+        return null;
+    }
+
+    // A chained statement is matched through the Connection call that creates it.
     public void jdbcChainedExecute(Connection connection, String sql) {
         TransactionalExecutor.executeInWriteTransaction(transaction -> {
             try {
-                // known-miss: polarion-transaction-no-permission-check
+                // ruleid: polarion-transaction-no-permission-check
                 connection.prepareStatement(sql).execute();
             } catch (Exception e) {
                 throw new IllegalStateException(e);
