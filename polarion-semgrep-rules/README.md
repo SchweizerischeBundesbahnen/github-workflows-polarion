@@ -51,7 +51,8 @@ passing on a bare `> 0`. A case the rule is known not to reach carries
 |---|---|---|
 | `polarion-rest-no-authz-check` | WARNING | A REST controller method that changes state without `@Secured` or a per-endpoint permission check. Suppressed for classes whose `@Path` starts with `/internal`. |
 | `polarion-get-with-write-transaction` | ERROR | A `@GET` method that opens a write transaction. |
-| `polarion-transaction-no-permission-check` | INFO | A write transaction opened without an explicit permission check. |
+| `polarion-transaction-no-permission-check` | WARNING | A call inside a write transaction that changes state outside a platform API (JDBC update, `java.io` / `java.nio.file` / commons-io write, `setAccessible(true)`), with no `checkPermission` / `hasPermission` call before it. |
+| `polarion-elevated-privileges` | WARNING | `doAsSystemUser(...)`, `getSystemUserSubject()` or `loginUserFromVault(...)`: code that runs with rights other than the request user's. |
 | `polarion-velocity-ssti` | ERROR | `VelocityEngine` constructed without `SecureUberspector`, which exposes Java reflection to template authors. |
 | `polarion-xxe-unsafe-parser` | ERROR | `DocumentBuilderFactory` / `SAXParserFactory` / `XMLInputFactory` created without `disallow-doctype-decl` or an emptied `ACCESS_EXTERNAL_DTD`. |
 | `polarion-hardcoded-creds-config` | ERROR | A non-placeholder credential in a `.properties` or `.xml` configuration file. |
@@ -89,6 +90,28 @@ rule. Widening those two rules to reach four more shapes introduced no finding o
 any real target, which is the only evidence that matters for whether the widening
 is safe to ship: their fixtures grew from 1 and 5 asserted cases to 5 and 9.
 
+Re-measured against current `main` on 2026-09-14, semgrep 1.172.0, before and
+after `polarion-transaction-no-permission-check` was narrowed to calls that
+bypass the platform and `polarion-elevated-privileges` was added:
+
+| Target | `main` SHA | Before | After |
+|---|---|---|---|
+| api-extender | aba70af | 1 | 0 |
+| generic | 53d498c | 2 | 0 |
+| pdf-exporter | 48f77f65 | 0 | 0 |
+| docx-exporter | 3f1a2fb | 0 | 0 |
+| diff-tool | 9df71f0 | 15 | 2 |
+
+Before the change all 18 findings were `polarion-transaction-no-permission-check`
+at INFO, one per write transaction, and none needed a code change: each one wrote
+through a platform API that checks permissions itself. After it the narrowed rule
+fires nowhere on the corpus. The 2 remaining findings are `polarion-elevated-privileges`
+in diff-tool: `DocumentCopyService` sets a comment author as the system user, and
+`ExecutionQueueSettings` reads global settings as the system user. Both are the
+review the rule exists to prompt. The two changed rules were also run over the 17
+other local `ch.sbb.polarion.extension.*` repositories with Java sources, with 0
+findings.
+
 ## Known rule gaps
 
 Each limitation below is a deliberate trade against false positives, and is
@@ -106,14 +129,41 @@ repeated in the header of the rule it applies to.
 - **`polarion-get-with-write-transaction` is the residual CSRF case.**
   `SameSite=Lax` does not block a cookie-bearing cross-origin `GET`, so a
   side-effecting `GET` on `/internal/*` remains reachable through an
-  `<img src=…>`. This is why the rule is ERROR while its sibling is INFO.
-- **`polarion-transaction-no-permission-check` is informational by design.**
-  Polarion platform APIs (`IDataService`, `IRepositoryConnection`, IPObject
-  mutators) self-check the active Subject and throw `PermissionDeniedException`.
-  `PolarionService.callPrivileged` is misleadingly named: it runs its lambda as
-  the request's actual user, not as an elevated subject. Extension-level
-  `checkPermission` is therefore defense-in-depth. The rule still catches
-  mutations made outside a platform API — raw JDBC, direct file IO, reflection.
+  `<img src=…>`. This is why the rule is ERROR, while
+  `polarion-transaction-no-permission-check` needs a bypass of the platform to
+  fire and is WARNING.
+- **`polarion-transaction-no-permission-check` reports the bypass, not the
+  transaction.** Polarion platform APIs (`IDataService`, `IRepositoryConnection`,
+  IPObject mutators) self-check the active Subject and throw
+  `PermissionDeniedException`. `PolarionService.callPrivileged` is misleadingly
+  named: it runs its lambda as the request's actual user, not as an elevated
+  subject. So a write transaction that changes state through a platform API is
+  already authorized, and the rule fires only on a call inside it that checks
+  nothing: a JDBC update, a `java.io` / `java.nio.file` / commons-io write, or
+  `setAccessible(true)`. Until 2026-09 it fired on every write transaction
+  without an explicit check, at INFO, which on the corpus was 18 findings and no
+  defect.
+
+  Three shapes are out of reach. A bypass in a helper method that the
+  transaction lambda calls is not reported, because semgrep does not follow
+  calls. A chained `connection.prepareStatement(sql).execute()` is not reported,
+  because its receiver has no declared type. Both are annotated `known-miss:` in
+  the vulnerable fixture. A bypass in a read-only transaction or outside any
+  transaction is not reported either: file IO outside a write transaction is
+  routine on the corpus (export logs, temporary files). The permission check is
+  matched as a `checkPermission(...)` statement or a `hasPermission(...)`
+  condition placed before the change, so an extension helper with another name
+  (`checkPermissions()`, `isModificationAllowed()`) does not clear the rule, and
+  a guard whose branch does not stop the change does.
+- **`polarion-elevated-privileges` reports the elevation, not its effect.**
+  `doAsSystemUser(...)`, `getSystemUserSubject()` and `loginUserFromVault(...)`
+  are matched wherever they appear, whether the block reads or writes, because a
+  read as the system user can expose data the caller may not see. A read of
+  global configuration that every user may cause is a valid dismissal. The
+  receiver is not typed, so the chained
+  `lookupService(ISecurityService.class).doAsSystemUser(...)` is reached; a
+  method with the same name on another type would be reported as well, and none
+  exists on the corpus.
 - **`polarion-velocity-ssti` suppression is class-scoped wherever the
   construction has no enclosing method.** The match is `new VelocityEngine(...)`
   itself, so all four shapes are reached — a bare statement, `return new

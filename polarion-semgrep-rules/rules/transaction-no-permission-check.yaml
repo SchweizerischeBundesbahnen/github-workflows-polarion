@@ -1,45 +1,31 @@
 rules:
   - id: polarion-transaction-no-permission-check
     languages: [java]
-    severity: INFO
+    severity: WARNING
     message: |
-      Write transaction does not contain an explicit
-      ISecurityService.checkPermission call.
+      Write transaction changes state outside a Polarion platform API, and no
+      `checkPermission(...)` or `hasPermission(...)` call precedes the change.
 
-      Confirmed informational on the SBB Polarion extension stack:
-      Polarion platform APIs (IDataService, IRepositoryConnection,
-      IPObject mutations) self-check the active Subject's permissions
-      and throw PermissionDeniedException on rejection. The active
-      Subject is established by:
+      Polarion platform APIs (`IDataService`, `IRepositoryConnection`, IPObject
+      mutators) check the active Subject themselves and throw
+      `PermissionDeniedException`. JDBC updates, `java.io` / `java.nio.file`
+      writes, commons-io `FileUtils` writes and reflection with
+      `setAccessible(true)` check nothing. Inside a write transaction such a
+      call is the only thing between the caller and the change.
 
-        - /internal/* flows: DoAsFilter, from the FORM-authenticated
-          Polarion session (real user).
-        - /api/* flows: polarionService.callPrivileged(...), which
-          despite the name calls
-          securityService.doAsUser(RequestContextUtil.getUserSubject(), ...)
-          — i.e., runs the lambda as the request's actual user Subject
-          (the PAT holder or token holder), NOT as an elevated/admin
-          subject. Verified on
-          https://github.com/SchweizerischeBundesbahnen/ch.sbb.polarion.extension.generic/blob/main/app/src/main/java/ch/sbb/polarion/extension/generic/service/PolarionService.java
-          (callPrivileged at ~L282).
+      The active Subject is the request's real user on both REST flows:
+        - /internal/* flows: DoAsFilter, from the FORM-authenticated session.
+        - /api/* flows: polarionService.callPrivileged(...), which despite the
+          name runs doAsUser(RequestContextUtil.getUserSubject(), ...).
+      So a write made through a platform API is already authorized, and this
+      rule does not report it.
 
-      In both flows the platform self-check IS the authorization gate.
-      An extension-level checkPermission would be defense-in-depth, not
-      strictly required. This rule remains in the pack as:
-        - A regression guard against future code that mutates state
-          *outside* a platform API (e.g., direct SVN access without
-          IRepositoryConnection, or a future API path that does
-          elevate privileges).
-        - A reminder to confirm that the transaction body really does
-          go through platform APIs that check (not, e.g., a raw JDBC
-          mutation wrapped in TransactionalExecutor).
-
-      Reviewer action: confirm the transaction body's writes are made
-      via platform APIs (IRepositoryConnection, IPObject.* mutators,
-      IDataService). If yes, this is informational. If the body bypasses
-      the platform (raw JDBC, direct file IO under polarion's repo,
-      reflection on platform internals), treat as ERROR and add an
-      explicit checkPermission.
+      Fix, in order of preference:
+        - Make the change through a platform API.
+        - Call `securityService.checkPermission(...)` before the change, or
+          guard it with `hasPermission(...)`.
+        - If the change is not Polarion state (for example a temporary file),
+          move it out of the write transaction.
 
       See <https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/blob/main/polarion-semgrep-rules/README.md>
       and the README "REST architecture: /internal vs /api" section of
@@ -51,7 +37,7 @@ rules:
         - "CWE-269: Improper Privilege Management"
       owasp:
         - "A01:2021 - Broken Access Control"
-      confidence: LOW
+      confidence: MEDIUM
       likelihood: LOW
       impact: HIGH
       polarion-rule: true
@@ -60,12 +46,77 @@ rules:
         - https://github.com/SchweizerischeBundesbahnen/ch.sbb.polarion.extension.generic/blob/main/app/src/main/java/ch/sbb/polarion/extension/generic/service/PolarionService.java
         - https://testdrive.polarion.com/polarion/sdk/doc/javadoc-rendering/com/polarion/alm/shared/api/transaction/TransactionalExecutor.html
         - https://testdrive.polarion.com/polarion/sdk/doc/javadoc/com/polarion/platform/security/ISecurityService.html
-    pattern-either:
-      - patterns:
-          - pattern: |
-              TransactionalExecutor.executeInWriteTransaction($LAMBDA);
-          - pattern-not-regex: '\b(check|has)Permissions?\s*\('
-      - patterns:
-          - pattern: |
-              $EXEC.executeInWriteTransaction($LAMBDA);
-          - pattern-not-regex: '\b(check|has)Permissions?\s*\('
+    # The finding lands on the call that bypasses the platform, not on the
+    # transaction. Until 2026-09 this rule reported every write transaction
+    # without a permission check, which on the corpus meant every write
+    # transaction: 18 findings, all informational, because platform APIs check
+    # permissions themselves. The id is kept so the alert history stays
+    # attached to one rule.
+    #
+    # `executeInWriteTransaction` is the only write entry point of
+    # TransactionalExecutor (checked against the 2606 SDK). `$EXEC` also covers
+    # a static import and any delegating executor with the same method name.
+    #
+    # KNOWN LIMITATION: semgrep matches within one file and does not follow
+    # calls. A bypass inside a helper method that the transaction lambda calls
+    # is not reported. Nor is a bypass in a read-only transaction or outside
+    # any transaction: without the write transaction there is no signal that
+    # the code changes Polarion state, and file IO outside it is routine
+    # (export logs, temporary files).
+    patterns:
+      - pattern-inside: $EXEC.executeInWriteTransaction(...)
+      - pattern-either:
+          # JDBC. The update methods are specific enough to match untyped.
+          # `execute(...)` is not, so it needs a declared java.sql receiver;
+          # a chained `connection.prepareStatement(sql).execute()` has no
+          # declared type and is a known miss.
+          - pattern: $STATEMENT.executeUpdate(...)
+          - pattern: $STATEMENT.executeLargeUpdate(...)
+          - pattern: $STATEMENT.executeBatch()
+          - pattern: (java.sql.Statement $STATEMENT).execute(...)
+          - pattern: (java.sql.PreparedStatement $STATEMENT).execute(...)
+          - pattern: (java.sql.CallableStatement $STATEMENT).execute(...)
+          # java.nio.file. Reads (`readString`, `exists`, `newInputStream`)
+          # are not changes and are not matched.
+          - patterns:
+              - pattern: java.nio.file.Files.$FILES_OP(...)
+              - metavariable-regex:
+                  metavariable: $FILES_OP
+                  regex: ^(write|writeString|newOutputStream|newBufferedWriter|delete|deleteIfExists|move|copy|createFile|createDirectory|createDirectories|createLink|createSymbolicLink|setAttribute|setOwner|setPosixFilePermissions|setLastModifiedTime)$
+          # java.io.
+          - pattern: new java.io.FileOutputStream(...)
+          - pattern: new java.io.FileWriter(...)
+          - pattern: new java.io.RandomAccessFile(...)
+          - patterns:
+              - pattern: (java.io.File $FILE).$FILE_OP(...)
+              - metavariable-regex:
+                  metavariable: $FILE_OP
+                  regex: ^(delete|renameTo|mkdir|mkdirs|createNewFile|setWritable|setReadable|setExecutable|setLastModified)$
+          # commons-io.
+          - patterns:
+              - pattern: org.apache.commons.io.FileUtils.$FILEUTILS_OP(...)
+              - metavariable-regex:
+                  metavariable: $FILEUTILS_OP
+                  regex: ^(write|writeByteArrayToFile|writeLines|writeStringToFile|copy\w*|move\w*|delete\w*|forceDelete\w*|forceMkdir\w*|cleanDirectory|touch)$
+          # Reflection that opens platform internals.
+          - pattern: $MEMBER.setAccessible(true)
+      # The permission check is matched as a CALL that comes BEFORE the change
+      # in the same block or an enclosing one, never as a regex over the
+      # region: a regex is applied to the region as text, so a comment naming
+      # `checkPermission(` cleared the previous version of this rule. A check
+      # placed after the change does not clear it, and neither does a check in
+      # a sibling method. Both shapes are pinned in the vulnerable fixture.
+      #
+      # KNOWN LIMITATION: a check wrapped in an extension helper with another
+      # name (`checkPermissions()`, `isModificationAllowed()`) is not
+      # recognized, and neither is a guard whose branch does not stop the
+      # change, such as `if (!hasPermission(...)) { log(...); }`. Semgrep
+      # matches statements, not paths.
+      - pattern-not-inside: |
+          $SECURITY.checkPermission(...);
+          ...
+      - pattern-not-inside: |
+          if (<... $SECURITY.hasPermission(...) ...>) $GUARD;
+          ...
+      - pattern-not-inside: |
+          if (<... $SECURITY.hasPermission(...) ...>) { ... }
