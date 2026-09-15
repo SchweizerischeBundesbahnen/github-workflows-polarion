@@ -164,10 +164,9 @@ repeated in the header of the rule it applies to.
   reach, each pinned in the vulnerable fixture: a check in the caller does not
   clear a finding in its helper; an extension helper with another name
   (`checkPermissions()`, `isModificationAllowed()`) and a guard throwing another
-  type do not clear the rule;
-  a write in the `else` of a positive guard, a write inside a terminating guard,
-  and a guard that throws on one path only are cleared. Semgrep matches
-  statements, not paths.
+  type do not clear the rule; a write in the `else` of a positive guard, a write
+  inside a terminating guard, and a guard that throws on one path only are
+  cleared. Semgrep matches statements, not paths.
 - **`polarion-elevated-privileges` reports the elevation, not its effect.**
   `doAsSystemUser(...)`, `getSystemUserSubject()` and `loginUserFromVault(...)`
   are matched wherever they appear, whether the block reads or writes, because a
