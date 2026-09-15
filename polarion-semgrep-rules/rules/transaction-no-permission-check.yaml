@@ -160,6 +160,7 @@ rules:
       #     the check is looked up from the finding. Pinned as a reported case.
       #   - A check wrapped in an extension helper with another name
       #     (`checkPermissions()`, `isModificationAllowed()`) is not recognized.
+      #     Pinned as reported cases, one as a statement and one as a guard.
       #   - A guard that throws any other type (`IllegalStateException`) does
       #     not clear the rule. Pinned as a reported case. The accepted types
       #     are matched by simple name, as an import leaves them; an inline

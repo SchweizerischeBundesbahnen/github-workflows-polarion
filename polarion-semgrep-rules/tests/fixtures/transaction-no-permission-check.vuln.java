@@ -183,6 +183,41 @@ public class TransactionVulnerable {
         });
     }
 
+    // A check wrapped in an extension helper with another name is not
+    // recognized, neither as a statement nor as a guard. A documented false
+    // positive.
+    public void checkInRenamedHelper(String user, Path path, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            checkPermissions(user, resource);
+            try {
+                // ruleid: polarion-transaction-no-permission-check
+                Files.delete(path);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
+    public void guardInRenamedHelper(String user, File file, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (!isModificationAllowed(user, resource)) {
+                throw new PermissionDeniedException("not allowed");
+            }
+            // ruleid: polarion-transaction-no-permission-check
+            file.delete();
+            return null;
+        });
+    }
+
+    private void checkPermissions(String user, Object resource) {
+        securityService.checkPermission(user, "MODIFY", resource);
+    }
+
+    private boolean isModificationAllowed(String user, Object resource) {
+        return securityService.hasPermission(user, "MODIFY", resource);
+    }
+
     // A braceless positive guard covers its own statement only.
     public void bracelessGuardThenWrite(String user, File file, Object resource) {
         TransactionalExecutor.executeInWriteTransaction(transaction -> {

@@ -163,7 +163,8 @@ repeated in the header of the rule it applies to.
   cleared a write made precisely when permission is denied. What remains out of
   reach, each pinned in the vulnerable fixture: a check in the caller does not
   clear a finding in its helper; an extension helper with another name
-  (`checkPermissions()`) and a guard throwing another type do not clear the rule;
+  (`checkPermissions()`, `isModificationAllowed()`) and a guard throwing another
+  type do not clear the rule;
   a write in the `else` of a positive guard, a write inside a terminating guard,
   and a guard that throws on one path only are cleared. Semgrep matches
   statements, not paths.
