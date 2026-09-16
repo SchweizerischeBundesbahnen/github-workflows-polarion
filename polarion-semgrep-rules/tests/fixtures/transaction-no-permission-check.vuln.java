@@ -547,6 +547,33 @@ public class TransactionVulnerable {
         });
     }
 
+    // A conjunctive guard is not a guard: where the left operand is false the
+    // check never runs and the write goes through unchecked. Only the
+    // disjunctive shape clears the rule.
+    public void conjunctiveGuard(String user, Path path, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (resource != null && !securityService.hasPermission(user, "MODIFY", resource)) {
+                throw new PermissionDeniedException("not allowed");
+            }
+            try {
+                // ruleid: polarion-transaction-no-permission-check
+                Files.delete(path);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
+    public void conjunctiveGuardWithoutBraces(String user, File file, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (resource != null && !securityService.hasPermission(user, "MODIFY", resource)) throw new PermissionDeniedException("not allowed");
+            // ruleid: polarion-transaction-no-permission-check
+            file.delete();
+            return null;
+        });
+    }
+
     // A chained statement is matched through the Connection call that creates it.
     public void jdbcChainedExecute(Connection connection, String sql) {
         TransactionalExecutor.executeInWriteTransaction(transaction -> {

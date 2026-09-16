@@ -199,6 +199,23 @@ public class TransactionFixed {
         });
     }
 
+    // The metavariable absorbs a chain of the same operator, so a disjunction
+    // of any length clears as long as the check is one of its operands.
+    // ok: polarion-transaction-no-permission-check
+    public void nestedDisjunctiveGuard(String user, Path path, Object resource, Object other) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (resource == null || other == null || !securityService.hasPermission(user, "MODIFY", resource)) {
+                throw new PermissionDeniedException("not allowed");
+            }
+            try {
+                Files.delete(path);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
     // A positive compound condition clears its body, from either side of &&.
     // ok: polarion-transaction-no-permission-check
     public void positiveCompoundGuard(String user, File file, Object resource, boolean enabled) {
