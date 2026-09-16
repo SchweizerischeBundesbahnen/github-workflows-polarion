@@ -118,11 +118,14 @@ findings. Both numbers held through the review rounds that followed: one-level
 helpers, chained JDBC statements, guard polarity, helper arity, the widened write
 sinks, the compound guard shapes and the login entry points.
 
-The last of those rounds was re-measured differently, over all 43 local target
-repositories at once rather than the five above: 12 findings before and after the
-change, composition identical (diff-tool 2 `polarion-elevated-privileges`,
-fake-services 9 `polarion-rest-no-authz-check`, mailworkflow 1
-`polarion-workflow-function-no-authz`). `polarion-transaction-no-permission-check`
+Those later rounds were re-measured differently, on 2026-09-16 and semgrep
+1.172.0, over all 43 local target repositories at once rather than the five
+above. The number held at every step, before the round and after each change to
+the guard clauses: after they were restricted to the disjunctive shape, and
+after the two-sided form was added. Each run gave 12 findings with an identical
+composition: diff-tool 2 `polarion-elevated-privileges`, fake-services 9
+`polarion-rest-no-authz-check`, mailworkflow 1
+`polarion-workflow-function-no-authz`. `polarion-transaction-no-permission-check`
 reports nowhere on any of them.
 
 ## Known rule gaps
@@ -179,11 +182,12 @@ repeated in the header of the rule it applies to.
   statically imported spellings are recognized, because semgrep resolves all
   three. A negated condition may be a disjunction of any length, with the check
   in any position of the chain; a conjunction does not clear it, because on the
-  other branch the check never runs. A positive condition is reached through one level of
-  `&&`. Neither side uses a deep expression: inside a positive clause it matches
-  the negated call, inside a negated one it accepts a conjunction, and both
-  mistakes clear a write that nothing checked. What remains out of reach, each pinned in the vulnerable
-  fixture: a check in the caller does not clear a finding in its helper; an
+  other branch the check never runs. A positive condition is reached through
+  one level of `&&`. Neither side uses a deep expression: inside a positive
+  clause it matches the negated call, inside a negated one it accepts a
+  conjunction, and both mistakes clear a write that nothing checked. What
+  remains out of reach, each pinned in the vulnerable fixture: a check in the
+  caller does not clear a finding in its helper; an
   extension helper with another name (`checkPermissions()`,
   `isModificationAllowed()`), a receiverless delegate and a guard throwing
   another type do not clear the rule; a helper of the same name and arity in a
