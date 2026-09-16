@@ -214,6 +214,14 @@ rules:
       # means the guard fired whenever the check failed, so `||` is sound and
       # `&&` is not. Measured on semgrep 1.172.0; both shapes are pinned.
       #
+      # The check may sit ANYWHERE in the chain. Three spellings are needed,
+      # the plain condition and the check with a metavariable on one side or
+      # on both, because a metavariable absorbs the rest of the chain but a
+      # missing one matches nothing. With all three, a four-operand chain
+      # clears from every position; with only the two one-sided forms, a check
+      # in the middle of three was reported although the guard was sound.
+      # Measured on semgrep 1.172.0 and pinned in the fixed fixture.
+      #
       # KNOWN LIMITATION, all annotated `known-miss:` or pinned otherwise:
       #   - A check in the CALLER does not clear a finding in a helper, because
       #     the check is looked up from the finding. Pinned as a reported case.
@@ -261,6 +269,9 @@ rules:
           if (!$SECURITY.hasPermission(...) || $COND) { ... throw new PermissionDeniedException(...); }
           ...
       - pattern-not-inside: |
+          if ($COND || !$SECURITY.hasPermission(...) || $COND2) { ... throw new PermissionDeniedException(...); }
+          ...
+      - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...)) throw new PermissionDeniedException(...);
           ...
       - pattern-not-inside: |
@@ -268,6 +279,9 @@ rules:
           ...
       - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...) || $COND) throw new PermissionDeniedException(...);
+          ...
+      - pattern-not-inside: |
+          if ($COND || !$SECURITY.hasPermission(...) || $COND2) throw new PermissionDeniedException(...);
           ...
       - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...)) { ... throw new ForbiddenException(...); }
@@ -279,6 +293,9 @@ rules:
           if (!$SECURITY.hasPermission(...) || $COND) { ... throw new ForbiddenException(...); }
           ...
       - pattern-not-inside: |
+          if ($COND || !$SECURITY.hasPermission(...) || $COND2) { ... throw new ForbiddenException(...); }
+          ...
+      - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...)) throw new ForbiddenException(...);
           ...
       - pattern-not-inside: |
@@ -286,6 +303,9 @@ rules:
           ...
       - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...) || $COND) throw new ForbiddenException(...);
+          ...
+      - pattern-not-inside: |
+          if ($COND || !$SECURITY.hasPermission(...) || $COND2) throw new ForbiddenException(...);
           ...
       - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...)) { ... throw new NotAuthorizedException(...); }
@@ -297,6 +317,9 @@ rules:
           if (!$SECURITY.hasPermission(...) || $COND) { ... throw new NotAuthorizedException(...); }
           ...
       - pattern-not-inside: |
+          if ($COND || !$SECURITY.hasPermission(...) || $COND2) { ... throw new NotAuthorizedException(...); }
+          ...
+      - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...)) throw new NotAuthorizedException(...);
           ...
       - pattern-not-inside: |
@@ -304,6 +327,9 @@ rules:
           ...
       - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...) || $COND) throw new NotAuthorizedException(...);
+          ...
+      - pattern-not-inside: |
+          if ($COND || !$SECURITY.hasPermission(...) || $COND2) throw new NotAuthorizedException(...);
           ...
       - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...)) { ... throw new SecurityException(...); }
@@ -315,6 +341,9 @@ rules:
           if (!$SECURITY.hasPermission(...) || $COND) { ... throw new SecurityException(...); }
           ...
       - pattern-not-inside: |
+          if ($COND || !$SECURITY.hasPermission(...) || $COND2) { ... throw new SecurityException(...); }
+          ...
+      - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...)) throw new SecurityException(...);
           ...
       - pattern-not-inside: |
@@ -322,6 +351,9 @@ rules:
           ...
       - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...) || $COND) throw new SecurityException(...);
+          ...
+      - pattern-not-inside: |
+          if ($COND || !$SECURITY.hasPermission(...) || $COND2) throw new SecurityException(...);
           ...
       - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...)) { ... return; }
@@ -333,6 +365,9 @@ rules:
           if (!$SECURITY.hasPermission(...) || $COND) { ... return; }
           ...
       - pattern-not-inside: |
+          if ($COND || !$SECURITY.hasPermission(...) || $COND2) { ... return; }
+          ...
+      - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...)) { ... return $VALUE; }
           ...
       - pattern-not-inside: |
@@ -340,6 +375,9 @@ rules:
           ...
       - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...) || $COND) { ... return $VALUE; }
+          ...
+      - pattern-not-inside: |
+          if ($COND || !$SECURITY.hasPermission(...) || $COND2) { ... return $VALUE; }
           ...
       # A braced negated clause does not reach a braceless branch, so each
       # negated clause comes in both forms. The braced positive clause below
@@ -355,6 +393,9 @@ rules:
           if (!$SECURITY.hasPermission(...) || $COND) return;
           ...
       - pattern-not-inside: |
+          if ($COND || !$SECURITY.hasPermission(...) || $COND2) return;
+          ...
+      - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...)) return $VALUE;
           ...
       - pattern-not-inside: |
@@ -362,6 +403,9 @@ rules:
           ...
       - pattern-not-inside: |
           if (!$SECURITY.hasPermission(...) || $COND) return $VALUE;
+          ...
+      - pattern-not-inside: |
+          if ($COND || !$SECURITY.hasPermission(...) || $COND2) return $VALUE;
           ...
       # A positive check clears its body when the condition is a conjunction
       # too. The deep expression `<... $SECURITY.hasPermission(...) ...>` would

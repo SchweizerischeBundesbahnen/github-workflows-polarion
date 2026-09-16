@@ -178,8 +178,8 @@ repeated in the header of the rule it applies to.
   receiver: `securityService.checkPermission(...)`, `this.`-qualified and
   statically imported spellings are recognized, because semgrep resolves all
   three. A negated condition may be a disjunction of any length, with the check
-  on either side; a conjunction does not clear it, because on the other branch
-  the check never runs. A positive condition is reached through one level of
+  in any position of the chain; a conjunction does not clear it, because on the
+  other branch the check never runs. A positive condition is reached through one level of
   `&&`. Neither side uses a deep expression: inside a positive clause it matches
   the negated call, inside a negated one it accepts a conjunction, and both
   mistakes clear a write that nothing checked. What remains out of reach, each pinned in the vulnerable

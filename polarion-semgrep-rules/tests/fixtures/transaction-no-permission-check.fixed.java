@@ -211,6 +211,18 @@ public class TransactionFixed {
         });
     }
 
+    // The check may also sit in the middle of the chain.
+    // ok: polarion-transaction-no-permission-check
+    public void middleOfChainGuard(String user, File file, Object resource, Object other) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (resource == null || !securityService.hasPermission(user, "MODIFY", resource) || other == null) {
+                throw new PermissionDeniedException("not allowed");
+            }
+            file.delete();
+            return null;
+        });
+    }
+
     // The metavariable absorbs a chain of the same operator, so a disjunction
     // of any length clears as long as the check is one of its operands.
     // ok: polarion-transaction-no-permission-check
