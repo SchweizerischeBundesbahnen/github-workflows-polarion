@@ -30,4 +30,11 @@ public class ElevatedPrivilegesFixed {
     public String currentUser() {
         return securityService.getCurrentUser();
     }
+
+    // The no-argument login re-authenticates the request user, it elevates
+    // nothing. This is the generic PersonalAccessTokenValidator spelling.
+    // ok: polarion-elevated-privileges
+    public Object reauthenticateRequestUser() {
+        return securityService.login();
+    }
 }

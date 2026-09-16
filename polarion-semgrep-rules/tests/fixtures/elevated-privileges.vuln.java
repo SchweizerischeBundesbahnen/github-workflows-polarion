@@ -40,4 +40,18 @@ public class ElevatedPrivilegesVulnerable {
         // ruleid: polarion-elevated-privileges
         return securityService.loginUserFromVault("technical-account", null);
     }
+
+    // Logging in a named account and running as it is the same elevation as
+    // doAsSystemUser, reached by another route.
+    public void runAsNamedAccount(String user, String password, PrivilegedAction<Void> action) {
+        // ruleid: polarion-elevated-privileges
+        Subject subject = securityService.login(user, password, null);
+        securityService.doAsUser(subject, action);
+    }
+
+    public void runAsTokenAccount(String user, String token, PrivilegedAction<Void> action) {
+        // ruleid: polarion-elevated-privileges
+        Subject subject = securityService.loginWithToken(user, token, null);
+        securityService.doAsUser(subject, action);
+    }
 }

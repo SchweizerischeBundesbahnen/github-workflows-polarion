@@ -9,6 +9,9 @@ rules:
       Polarion system user, which passes every platform permission check.
       `loginUserFromVault(...)` logs in with credentials stored in the user
       account vault, which are usually a technical account with wide rights.
+      `login(user, password, context)` and `loginWithToken(...)` authenticate
+      a named account from code, and the Subject they return is normally
+      passed to `doAsUser(...)`, which is the same elevation in effect.
       Inside such a block the platform self-check no longer protects
       anything: a caller who reaches it acts with the elevated rights.
 
@@ -48,7 +51,15 @@ rules:
     # `getSystemUserSubject()` is matched on its own rather than as the first
     # argument of `doAsUser(...)`: the subject is often stored in a variable
     # first, and obtaining it is the elevation step either way.
+    #
+    # `login(...)` is matched at its THREE-argument arity only. The no-argument
+    # `securityService.login()` re-authenticates the current request user and
+    # is not an elevation; it is the spelling on the corpus
+    # (generic `PersonalAccessTokenValidator`), and an untyped `login(...)`
+    # reports it. Both spellings are pinned, one in each fixture.
     pattern-either:
       - pattern: $SECURITY.doAsSystemUser(...)
       - pattern: $SECURITY.getSystemUserSubject()
       - pattern: $SECURITY.loginUserFromVault(...)
+      - pattern: $SECURITY.login($USER, $PASSWORD, $CONTEXT)
+      - pattern: $SECURITY.loginWithToken(...)
