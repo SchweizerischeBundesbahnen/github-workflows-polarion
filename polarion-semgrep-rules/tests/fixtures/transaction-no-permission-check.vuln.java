@@ -7,9 +7,12 @@ import com.polarion.platform.security.ISecurityService;
 import com.polarion.platform.security.PermissionDeniedException;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
@@ -421,6 +424,127 @@ public class TransactionVulnerable {
             // ignored
         }
         return null;
+    }
+
+    // A check called without a receiver is not recognized, even when it
+    // delegates to the platform check. The `this.`-qualified and statically
+    // imported spellings are recognized; both sit in the fixed fixture.
+    // A documented false positive.
+    public void receiverlessCheck(String user, Path path, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            checkPermission(user, resource);
+            try {
+                // ruleid: polarion-transaction-no-permission-check
+                Files.delete(path);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
+    private void checkPermission(String user, Object resource) {
+        securityService.checkPermission(user, "MODIFY", resource);
+    }
+
+    // The helper branch matches on name and arity, and the enclosing class
+    // pattern is satisfied by the outer class, so a helper of the same name
+    // and arity in a NESTED class is reported although the transaction cannot
+    // reach it. A documented false positive.
+    public void callsOuterHelper(Path path) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            purgeTemporary(path);
+            return null;
+        });
+    }
+
+    private void purgeTemporary(Path path) {
+        try {
+            // ruleid: polarion-transaction-no-permission-check
+            Files.deleteIfExists(path);
+        } catch (Exception e) {
+            // ignored
+        }
+    }
+
+    static class NestedStore {
+        private void purgeTemporary(Path path) {
+            try {
+                // ruleid: polarion-transaction-no-permission-check
+                Files.delete(path);
+            } catch (Exception e) {
+                // ignored
+            }
+        }
+    }
+
+    // The helper branch is spelled out for 0 to 3 parameters, so a helper with
+    // four is not followed.
+    public void helperWithFourParameters(Path path, String first, String second, String third) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            writeAll(path, first, second, third);
+            return null;
+        });
+    }
+
+    private void writeAll(Path path, String first, String second, String third) {
+        try {
+            // known-miss: polarion-transaction-no-permission-check
+            Files.writeString(path, first + second + third);
+        } catch (Exception e) {
+            // ignored
+        }
+    }
+
+    // PrintWriter and PrintStream reach a file when constructed from a file
+    // name or a File.
+    public void printWriterToFileName(String fileName) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            // ruleid: polarion-transaction-no-permission-check
+            try (PrintWriter writer = new PrintWriter(fileName)) {
+                writer.println("entry");
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
+    public void printStreamToFile(File file) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            // ruleid: polarion-transaction-no-permission-check
+            try (PrintStream stream = new PrintStream(file)) {
+                stream.println("entry");
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
+    public void commonsOpenOutputStream(File file) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            try {
+                // ruleid: polarion-transaction-no-permission-check
+                FileUtils.openOutputStream(file).close();
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+    }
+
+    // newByteChannel opens for reading unless a write option is passed.
+    public void byteChannelForWriting(Path path) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            try {
+                // ruleid: polarion-transaction-no-permission-check
+                Files.newByteChannel(path, StandardOpenOption.WRITE).close();
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
     }
 
     // A chained statement is matched through the Connection call that creates it.

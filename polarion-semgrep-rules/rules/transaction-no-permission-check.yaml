@@ -78,8 +78,16 @@ rules:
           # and does not descend into a BLOCK lambda body, so it missed the
           # most common shape, `tx -> { helper(path); return null; }`. Measured
           # on semgrep 1.172.0.
+          # $HELPER binds the method NAME only, so the call and the declaration
+          # must agree on ARITY as well. Without that, an unrelated overload of
+          # the same name is reported as reachable from the transaction:
+          # measured on semgrep 1.172.0, a class whose lambda calls
+          # `record(marker)` also reported `record(Path, String)` doing routine
+          # temporary-file IO. Arity is not expressible as a wildcard, so the
+          # branch is repeated for 0 to 3 parameters. A helper with four or
+          # more parameters is not followed and is annotated `known-miss:`.
           - patterns:
-              - pattern-inside: |
+              - pattern-inside: &transaction-caller |
                   class $CLASS {
                     ...
                     $CALLER_RET $CALLER(...) {
@@ -90,12 +98,39 @@ rules:
                     ...
                   }
               - pattern-inside: |
-                  $HELPER_RET $HELPER(...) { ... }
+                  $HELPER_RET $HELPER() { ... }
               - metavariable-pattern:
                   metavariable: $LAMBDA
                   pattern-either:
-                    - pattern: $HELPER(...)
-                    - pattern: this.$HELPER(...)
+                    - pattern: $HELPER()
+                    - pattern: this.$HELPER()
+          - patterns:
+              - pattern-inside: *transaction-caller
+              - pattern-inside: |
+                  $HELPER_RET $HELPER($T1 $P1) { ... }
+              - metavariable-pattern:
+                  metavariable: $LAMBDA
+                  pattern-either:
+                    - pattern: $HELPER($A1)
+                    - pattern: this.$HELPER($A1)
+          - patterns:
+              - pattern-inside: *transaction-caller
+              - pattern-inside: |
+                  $HELPER_RET $HELPER($T1 $P1, $T2 $P2) { ... }
+              - metavariable-pattern:
+                  metavariable: $LAMBDA
+                  pattern-either:
+                    - pattern: $HELPER($A1, $A2)
+                    - pattern: this.$HELPER($A1, $A2)
+          - patterns:
+              - pattern-inside: *transaction-caller
+              - pattern-inside: |
+                  $HELPER_RET $HELPER($T1 $P1, $T2 $P2, $T3 $P3) { ... }
+              - metavariable-pattern:
+                  metavariable: $LAMBDA
+                  pattern-either:
+                    - pattern: $HELPER($A1, $A2, $A3)
+                    - pattern: this.$HELPER($A1, $A2, $A3)
       - pattern-either:
           # JDBC. The update methods are specific enough to match untyped.
           # `execute(...)` is not, so it needs either a declared java.sql
@@ -117,10 +152,25 @@ rules:
               - metavariable-regex:
                   metavariable: $FILES_OP
                   regex: ^(write|writeString|newOutputStream|newBufferedWriter|delete|deleteIfExists|move|copy|createFile|createDirectory|createDirectories|createLink|createSymbolicLink|setAttribute|setOwner|setPosixFilePermissions|setLastModifiedTime)$
+          # `newByteChannel` opens for READING unless a write option is passed,
+          # so the option is part of the pattern rather than the method name.
+          - pattern: java.nio.file.Files.newByteChannel($PATH, ..., java.nio.file.StandardOpenOption.WRITE, ...)
+          - pattern: java.nio.file.Files.newByteChannel($PATH, ..., java.nio.file.StandardOpenOption.APPEND, ...)
+          - pattern: java.nio.file.Files.newByteChannel($PATH, ..., java.nio.file.StandardOpenOption.CREATE, ...)
+          - pattern: java.nio.file.Files.newByteChannel($PATH, ..., java.nio.file.StandardOpenOption.CREATE_NEW, ...)
           # java.io.
           - pattern: new java.io.FileOutputStream(...)
           - pattern: new java.io.FileWriter(...)
           - pattern: new java.io.RandomAccessFile(...)
+          # `PrintWriter` / `PrintStream` reach a file only when constructed
+          # from a File or a file name. The argument is typed because the
+          # corpus spelling is `new PrintWriter(new StringWriter())` inside
+          # `printStackTrace`, a string buffer rather than a write; untyped
+          # patterns report it.
+          - pattern: new java.io.PrintWriter((java.io.File $FILE), ...)
+          - pattern: new java.io.PrintWriter((String $FILE_NAME), ...)
+          - pattern: new java.io.PrintStream((java.io.File $FILE), ...)
+          - pattern: new java.io.PrintStream((String $FILE_NAME), ...)
           - patterns:
               - pattern: (java.io.File $FILE).$FILE_OP(...)
               - metavariable-regex:
@@ -131,7 +181,7 @@ rules:
               - pattern: org.apache.commons.io.FileUtils.$FILEUTILS_OP(...)
               - metavariable-regex:
                   metavariable: $FILEUTILS_OP
-                  regex: ^(write|writeByteArrayToFile|writeLines|writeStringToFile|copy\w*|move\w*|delete\w*|forceDelete\w*|forceMkdir\w*|cleanDirectory|touch)$
+                  regex: ^(write|writeByteArrayToFile|writeLines|writeStringToFile|openOutputStream|copy\w*|move\w*|delete\w*|forceDelete\w*|forceMkdir\w*|cleanDirectory|touch)$
           # Reflection that opens platform internals.
           - pattern: $MEMBER.setAccessible(true)
       # The permission check is matched as a CALL that comes BEFORE the change
@@ -161,6 +211,21 @@ rules:
       #   - A check wrapped in an extension helper with another name
       #     (`checkPermissions()`, `isModificationAllowed()`) is not recognized.
       #     Pinned as reported cases, one as a statement and one as a guard.
+      #   - A check called WITHOUT a receiver is not recognized either, even
+      #     when it delegates to the platform check in the same class. The
+      #     `this.`-qualified spelling and a statically imported check ARE
+      #     recognized, because semgrep resolves both to a receiver. All three
+      #     are pinned, the reported one in the vulnerable fixture and the two
+      #     cleared ones in the fixed fixture.
+      #   - The conjunction clauses reach ONE level of `&&`, so a positive
+      #     check nested deeper (`a && (b && hasPermission(...))`) does not
+      #     clear. The negated clauses use a deep expression and have no such
+      #     limit.
+      #   - A helper of the same NAME AND ARITY in a NESTED class is reported,
+      #     because the enclosing class pattern is satisfied by the outer
+      #     class. Pinned as a reported case.
+      #   - A helper with four or more parameters is not followed at all.
+      #     Annotated `known-miss:`.
       #   - A guard that throws any other type (`IllegalStateException`) does
       #     not clear the rule. Pinned as a reported case. The accepted types
       #     are matched by simple name, as an import leaves them; an inline
@@ -178,44 +243,55 @@ rules:
           $SECURITY.checkPermission(...);
           ...
       - pattern-not-inside: |
-          if (!$SECURITY.hasPermission(...)) { ... throw new PermissionDeniedException(...); }
+          if (<... !$SECURITY.hasPermission(...) ...>) { ... throw new PermissionDeniedException(...); }
           ...
       - pattern-not-inside: |
-          if (!$SECURITY.hasPermission(...)) throw new PermissionDeniedException(...);
+          if (<... !$SECURITY.hasPermission(...) ...>) throw new PermissionDeniedException(...);
           ...
       - pattern-not-inside: |
-          if (!$SECURITY.hasPermission(...)) { ... throw new ForbiddenException(...); }
+          if (<... !$SECURITY.hasPermission(...) ...>) { ... throw new ForbiddenException(...); }
           ...
       - pattern-not-inside: |
-          if (!$SECURITY.hasPermission(...)) throw new ForbiddenException(...);
+          if (<... !$SECURITY.hasPermission(...) ...>) throw new ForbiddenException(...);
           ...
       - pattern-not-inside: |
-          if (!$SECURITY.hasPermission(...)) { ... throw new NotAuthorizedException(...); }
+          if (<... !$SECURITY.hasPermission(...) ...>) { ... throw new NotAuthorizedException(...); }
           ...
       - pattern-not-inside: |
-          if (!$SECURITY.hasPermission(...)) throw new NotAuthorizedException(...);
+          if (<... !$SECURITY.hasPermission(...) ...>) throw new NotAuthorizedException(...);
           ...
       - pattern-not-inside: |
-          if (!$SECURITY.hasPermission(...)) { ... throw new SecurityException(...); }
+          if (<... !$SECURITY.hasPermission(...) ...>) { ... throw new SecurityException(...); }
           ...
       - pattern-not-inside: |
-          if (!$SECURITY.hasPermission(...)) throw new SecurityException(...);
+          if (<... !$SECURITY.hasPermission(...) ...>) throw new SecurityException(...);
           ...
       - pattern-not-inside: |
-          if (!$SECURITY.hasPermission(...)) { ... return; }
+          if (<... !$SECURITY.hasPermission(...) ...>) { ... return; }
           ...
       - pattern-not-inside: |
-          if (!$SECURITY.hasPermission(...)) { ... return $VALUE; }
+          if (<... !$SECURITY.hasPermission(...) ...>) { ... return $VALUE; }
           ...
       # A braced negated clause does not reach a braceless branch, so each
       # negated clause comes in both forms. The braced positive clause below
       # does reach a braceless body, so one form is enough there. Both
       # measured on semgrep 1.172.0 and pinned in the fixed fixture.
       - pattern-not-inside: |
-          if (!$SECURITY.hasPermission(...)) return;
+          if (<... !$SECURITY.hasPermission(...) ...>) return;
           ...
       - pattern-not-inside: |
-          if (!$SECURITY.hasPermission(...)) return $VALUE;
+          if (<... !$SECURITY.hasPermission(...) ...>) return $VALUE;
           ...
+      # A positive check clears its body when the condition is a conjunction
+      # too. The deep expression `<... $SECURITY.hasPermission(...) ...>` would
+      # cover every conjunction at once and must NOT be used here: it matches
+      # the NEGATED call as well, so `if (!hasPermission(...)) { delete; }` is
+      # cleared again, the exact regression the polarity split fixed. The
+      # conjunction forms below keep the polarity and reach one level of `&&`.
+      # Measured on semgrep 1.172.0 and pinned in both fixtures.
       - pattern-not-inside: |
           if ($SECURITY.hasPermission(...)) { ... }
+      - pattern-not-inside: |
+          if ($SECURITY.hasPermission(...) && $COND) { ... }
+      - pattern-not-inside: |
+          if ($COND && $SECURITY.hasPermission(...)) { ... }
