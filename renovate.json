@@ -3,17 +3,66 @@
   "extends": [
     "github>SchweizerischeBundesbahnen/casc-renovate-preset-polarion"
   ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "PyPI versions pinned inline in a workflow run step. No built-in manager reads the text of a run: step - github-actions parses uses:, container: and services: only - so without this entry a pin such as `uvx --no-build --from commitizen==X` or `uv run --with pyyaml==X` freezes silently while the same tool keeps moving everywhere else. Renovate's own customManagers:githubActionsVersions preset does not cover these: its regex requires the `NAME_VERSION: <value>` colon form of a YAML env entry",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "--(?:from|with)\\s+(?<depName>[A-Za-z0-9._-]+)==(?<currentValue>[0-9][^\\s\"']*)"
+      ],
+      "datasourceTemplate": "pypi"
+    },
+    {
+      "customType": "regex",
+      "description": "The semgrep version the rule baseline was measured on. reusable-polarion-semgrep.yml and semgrep-rules-test.yml both read it out of this file and interpolate it into `uvx semgrep==${version}`, so the pin lives here and nothing else sees it",
+      "managerFilePatterns": [
+        "/^polarion-semgrep-rules/SEMGREP_VERSION$/"
+      ],
+      "matchStrings": [
+        "^(?<currentValue>\\d[^\\s]*)"
+      ],
+      "depNameTemplate": "semgrep",
+      "datasourceTemplate": "pypi"
+    },
+    {
+      "customType": "regex",
+      "description": "npm package versions pinned inline in an npx invocation. Nothing else reads them, and the alternative is the `@latest` this replaced, which resolves at run time and therefore gives a reusable workflow a different linter on every call",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "npx\\s+(?<depName>@?[A-Za-z0-9._/-]+)@(?<currentValue>[0-9][^\\s]*)"
+      ],
+      "datasourceTemplate": "npm"
+    }
+  ],
   "packageRules": [
     {
       "description": "Ungroup GitHub Actions so a single fast-releasing action cannot hold the whole group behind the minimumReleaseAge gate",
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": null
     },
     {
       "description": "anthropics/claude-code-action releases more often than the 3-day stability gate, so it never matures; track it with no soak so it updates",
-      "matchManagers": ["github-actions"],
-      "matchPackageNames": ["anthropics/claude-code-action"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchPackageNames": [
+        "anthropics/claude-code-action"
+      ],
       "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": "The customManagers above pin commit-gate and scan tooling, not anything this repository ships, so they stay `chore` against the preset's rule typing every dependency `fix` - the same reason the preset carves out the github-actions and pre-commit managers",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "semanticCommitType": "chore"
     }
   ]
 }
