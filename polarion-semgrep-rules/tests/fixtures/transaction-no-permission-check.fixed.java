@@ -199,6 +199,18 @@ public class TransactionFixed {
         });
     }
 
+    // The check may sit on either side of the disjunction.
+    // ok: polarion-transaction-no-permission-check
+    public void reversedDisjunctiveGuard(String user, File file, Object resource) {
+        TransactionalExecutor.executeInWriteTransaction(transaction -> {
+            if (!securityService.hasPermission(user, "MODIFY", resource) || resource == null) {
+                throw new PermissionDeniedException("not allowed");
+            }
+            file.delete();
+            return null;
+        });
+    }
+
     // The metavariable absorbs a chain of the same operator, so a disjunction
     // of any length clears as long as the check is one of its operands.
     // ok: polarion-transaction-no-permission-check
