@@ -187,14 +187,13 @@ repeated in the header of the rule it applies to.
   clause it matches the negated call, inside a negated one it accepts a
   conjunction, and both mistakes clear a write that nothing checked. What
   remains out of reach, each pinned in the vulnerable fixture: a check in the
-  caller does not clear a finding in its helper; an
-  extension helper with another name (`checkPermissions()`,
-  `isModificationAllowed()`), a receiverless delegate and a guard throwing
-  another type do not clear the rule; a helper of the same name and arity in a
-  nested class is reported although the transaction cannot reach it; a write in
-  the `else` of a positive guard, a write inside a terminating guard, and a
-  guard that throws on one path only are cleared. Semgrep matches statements,
-  not paths.
+  caller does not clear a finding in its helper; an extension helper with
+  another name (`checkPermissions()`, `isModificationAllowed()`), a
+  receiverless delegate and a guard throwing another type do not clear the
+  rule; a helper of the same name and arity in a nested class is reported
+  although the transaction cannot reach it; a write in the `else` of a positive
+  guard, a write inside a terminating guard, and a guard that throws on one
+  path only are cleared. Semgrep matches statements, not paths.
 - **`polarion-elevated-privileges` reports the elevation, not its effect.**
   `doAsSystemUser(...)`, `getSystemUserSubject()`, `loginUserFromVault(...)`,
   `login(user, password, context)` and `loginWithToken(...)` are matched wherever
