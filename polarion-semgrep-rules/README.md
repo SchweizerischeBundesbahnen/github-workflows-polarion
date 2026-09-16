@@ -51,7 +51,8 @@ passing on a bare `> 0`. A case the rule is known not to reach carries
 |---|---|---|
 | `polarion-rest-no-authz-check` | WARNING | A REST controller method that changes state without `@Secured` or a per-endpoint permission check. Suppressed for classes whose `@Path` starts with `/internal`. |
 | `polarion-get-with-write-transaction` | ERROR | A `@GET` method that opens a write transaction. |
-| `polarion-transaction-no-permission-check` | INFO | A write transaction opened without an explicit permission check. |
+| `polarion-transaction-no-permission-check` | WARNING | A call that changes state outside a platform API (JDBC update, `java.io` / `java.nio.file` / commons-io write, `setAccessible(true)`) inside a write transaction, or in a same-file method the transaction calls, with no permission check before it. |
+| `polarion-elevated-privileges` | WARNING | `doAsSystemUser(...)`, `getSystemUserSubject()`, `loginUserFromVault(...)`, `login(user, password, context)` or `loginWithToken(...)`: code that runs with, or logs in with, rights other than the request user's. |
 | `polarion-velocity-ssti` | ERROR | `VelocityEngine` constructed without `SecureUberspector`, which exposes Java reflection to template authors. |
 | `polarion-xxe-unsafe-parser` | ERROR | `DocumentBuilderFactory` / `SAXParserFactory` / `XMLInputFactory` created without `disallow-doctype-decl` or an emptied `ACCESS_EXTERNAL_DTD`. |
 | `polarion-hardcoded-creds-config` | ERROR | A non-placeholder credential in a `.properties` or `.xml` configuration file. |
@@ -60,7 +61,7 @@ passing on a bare `> 0`. A case the rule is known not to reach carries
 
 ## Baseline on the target corpus
 
-Both measurements below run the Polarion rules only, with no registry packs.
+The measurements below run the Polarion rules only, with no registry packs.
 
 The rules were tuned to a locked-in baseline of **13 findings** on 2026-05-06,
 at the SHAs recorded then: api-extender 1, generic 2, pdf-exporter 0,
@@ -76,11 +77,15 @@ Re-measured against current `main` on 2026-08-22, semgrep 1.172.0:
 | docx-exporter | f8d956f | 0 |
 | diff-tool | 079d9f7 | 15 |
 
-18 in total. Every one is `polarion-transaction-no-permission-check` at INFO;
-diff-tool gained five as new transactions were added since May. The other seven
-rules fire nowhere on the corpus and act as regression guards on new code. Treat
-that as the point of the pack in CI today: it is not a backlog of findings to
-clear.
+18 in total, at the rule set of that date. Every one was
+`polarion-transaction-no-permission-check`, which was INFO then and fired on
+every write transaction; diff-tool gained five as new transactions were added
+since May. The other rules of that date fired nowhere on the corpus and acted as
+regression guards on new code.
+
+That paragraph is historical. The rule was narrowed in 2026-09 and is now
+WARNING, `polarion-elevated-privileges` joined the pack, and nine rules ship.
+The current numbers are in the 2026-09 table below.
 
 The same five trees were measured with the rule pack as it stood before
 `polarion-velocity-ssti` and `polarion-xxe-unsafe-parser` were rewritten to match
@@ -88,6 +93,40 @@ hardening structurally, and the result is identical target by target and rule by
 rule. Widening those two rules to reach four more shapes introduced no finding on
 any real target, which is the only evidence that matters for whether the widening
 is safe to ship: their fixtures grew from 1 and 5 asserted cases to 5 and 9.
+
+Re-measured against current `main` on 2026-09-14, semgrep 1.172.0, before and
+after `polarion-transaction-no-permission-check` was narrowed to calls that
+bypass the platform and `polarion-elevated-privileges` was added:
+
+| Target | `main` SHA | Before | After |
+|---|---|---|---|
+| api-extender | aba70af | 1 | 0 |
+| generic | 53d498c | 2 | 0 |
+| pdf-exporter | 48f77f65 | 0 | 0 |
+| docx-exporter | 3f1a2fb | 0 | 0 |
+| diff-tool | 9df71f0 | 15 | 2 |
+
+Before the change all 18 findings were `polarion-transaction-no-permission-check`
+at INFO, one per write transaction, and none needed a code change: each one wrote
+through a platform API that checks permissions itself. After it the narrowed rule
+fires nowhere on the corpus. The 2 remaining findings are `polarion-elevated-privileges`
+in diff-tool: `DocumentCopyService` sets a comment author as the system user, and
+`ExecutionQueueSettings` reads global settings as the system user. Both are the
+review the rule exists to prompt. The two changed rules were also run over the 17
+other local `ch.sbb.polarion.extension.*` repositories with Java sources, with 0
+findings. Both numbers held through the review rounds that followed: one-level
+helpers, chained JDBC statements, guard polarity, helper arity, the widened write
+sinks, the compound guard shapes and the login entry points.
+
+Those later rounds were re-measured differently, on 2026-09-16 and semgrep
+1.172.0, over all 43 local target repositories at once rather than the five
+above. The number held at every step, before the round and after each change to
+the guard clauses: after they were restricted to the disjunctive shape, and
+after the two-sided form was added. Each run gave 12 findings with an identical
+composition: diff-tool 2 `polarion-elevated-privileges`, fake-services 9
+`polarion-rest-no-authz-check`, mailworkflow 1
+`polarion-workflow-function-no-authz`. `polarion-transaction-no-permission-check`
+reports nowhere on any of them.
 
 ## Known rule gaps
 
@@ -106,14 +145,68 @@ repeated in the header of the rule it applies to.
 - **`polarion-get-with-write-transaction` is the residual CSRF case.**
   `SameSite=Lax` does not block a cookie-bearing cross-origin `GET`, so a
   side-effecting `GET` on `/internal/*` remains reachable through an
-  `<img src=…>`. This is why the rule is ERROR while its sibling is INFO.
-- **`polarion-transaction-no-permission-check` is informational by design.**
-  Polarion platform APIs (`IDataService`, `IRepositoryConnection`, IPObject
-  mutators) self-check the active Subject and throw `PermissionDeniedException`.
-  `PolarionService.callPrivileged` is misleadingly named: it runs its lambda as
-  the request's actual user, not as an elevated subject. Extension-level
-  `checkPermission` is therefore defense-in-depth. The rule still catches
-  mutations made outside a platform API — raw JDBC, direct file IO, reflection.
+  `<img src=…>`. This is why the rule is ERROR, while
+  `polarion-transaction-no-permission-check` needs a bypass of the platform to
+  fire and is WARNING.
+- **`polarion-transaction-no-permission-check` reports the bypass, not the
+  transaction.** Polarion platform APIs (`IDataService`, `IRepositoryConnection`,
+  IPObject mutators) self-check the active Subject and throw
+  `PermissionDeniedException`. `PolarionService.callPrivileged` is misleadingly
+  named: it runs its lambda as the request's actual user, not as an elevated
+  subject. So a write transaction that changes state through a platform API is
+  already authorized, and the rule fires only on a call inside it that checks
+  nothing: a JDBC update, a `java.io` / `java.nio.file` / commons-io write, or
+  `setAccessible(true)`. Until 2026-09 it fired on every write transaction
+  without an explicit check, at INFO, which on the corpus was 18 findings and no
+  defect.
+
+  Calls are followed one level into a method of the same file, spelled
+  `helper(...)` or `this.helper(...)`, matched on name and arity for 0 to 3
+  parameters, and the finding lands in the helper. A helper two levels down, a
+  method on another object, a method reference and a helper with four or more
+  parameters are not followed, because semgrep reads one file at a time and
+  cannot wildcard an arity. A chained
+  `connection.prepareStatement(sql).execute()` is reached through the
+  `Connection` call that creates the statement. A bypass in a read-only
+  transaction or outside any transaction is not reported: file IO outside a
+  write transaction is routine on the corpus (export logs, temporary files).
+
+  The permission check is a `checkPermission(...)` statement before the change,
+  a positive `if (hasPermission(...))` around it, or a negated
+  `if (!hasPermission(...))` before it that returns or throws
+  `PermissionDeniedException`, `ForbiddenException`, `NotAuthorizedException` or
+  `SecurityException`, spelled by simple name. The thrown type is named because a
+  bare `throw` matched a rethrow in a `catch` nested in the guard body, which
+  cleared a write made precisely when permission is denied. The check needs a
+  receiver: `securityService.checkPermission(...)`, `this.`-qualified and
+  statically imported spellings are recognized, because semgrep resolves all
+  three. A negated condition may be a disjunction of any length, with the check
+  in any position of the chain; a conjunction does not clear it, because on the
+  other branch the check never runs. A positive condition is reached through
+  one level of `&&`. Neither side uses a deep expression: inside a positive
+  clause it matches the negated call, inside a negated one it accepts a
+  conjunction, and both mistakes clear a write that nothing checked. What
+  remains out of reach, each pinned in the vulnerable fixture: a check in the
+  caller does not clear a finding in its helper; an extension helper with
+  another name (`checkPermissions()`, `isModificationAllowed()`), a
+  receiverless delegate and a guard throwing another type do not clear the
+  rule; a helper of the same name and arity in a nested class is reported
+  although the transaction cannot reach it; a write in the `else` of a positive
+  guard, a write inside a terminating guard, and a guard that throws on one
+  path only are cleared. Semgrep matches statements, not paths.
+- **`polarion-elevated-privileges` reports the elevation, not its effect.**
+  `doAsSystemUser(...)`, `getSystemUserSubject()`, `loginUserFromVault(...)`,
+  `login(user, password, context)` and `loginWithToken(...)` are matched wherever
+  they appear, whether the block reads or writes, because a read as the system
+  user can expose data the caller may not see. `login(...)` is matched at its
+  three-argument arity only: the no-argument `securityService.login()`
+  re-authenticates the request user and elevates nothing, and it is the spelling
+  on the corpus. A read of
+  global configuration that every user may cause is a valid dismissal. The
+  receiver is not typed, so the chained
+  `lookupService(ISecurityService.class).doAsSystemUser(...)` is reached; a
+  method with the same name on another type would be reported as well, and none
+  exists on the corpus.
 - **`polarion-velocity-ssti` suppression is class-scoped wherever the
   construction has no enclosing method.** The match is `new VelocityEngine(...)`
   itself, so all four shapes are reached — a bare statement, `return new

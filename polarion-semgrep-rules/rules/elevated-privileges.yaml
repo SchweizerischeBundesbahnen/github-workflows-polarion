@@ -1,0 +1,65 @@
+rules:
+  - id: polarion-elevated-privileges
+    languages: [java]
+    severity: WARNING
+    message: |
+      Code runs as, or logs in as, a user other than the request's user.
+
+      `doAsSystemUser(...)` and `getSystemUserSubject()` give the code the
+      Polarion system user, which passes every platform permission check.
+      `loginUserFromVault(...)` logs in with credentials stored in the user
+      account vault, which are usually a technical account with wide rights.
+      `login(user, password, context)` and `loginWithToken(...)` authenticate
+      a named account from code, and the Subject they return is normally
+      passed to `doAsUser(...)`, which is the same elevation in effect.
+      Inside such a block the platform self-check no longer protects
+      anything: a caller who reaches it acts with the elevated rights.
+
+      Contrast `PolarionService.callPrivileged(...)`, which despite its name
+      runs as `RequestContextUtil.getUserSubject()`, the request's real user.
+      This rule does not report it.
+
+      Reviewer action:
+        - Confirm the elevated block does only what the caller is allowed
+          to cause, and that its inputs do not come from the caller
+          unchecked.
+        - Keep the block as small as possible. Prefer a single platform
+          call inside it.
+        - A read of global configuration that every user may cause is a
+          valid dismissal. Say so in the dismissal comment.
+
+      See <https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/blob/main/polarion-semgrep-rules/README.md>.
+    metadata:
+      category: security
+      cwe:
+        - "CWE-250: Execution with Unnecessary Privileges"
+        - "CWE-269: Improper Privilege Management"
+      owasp:
+        - "A01:2021 - Broken Access Control"
+      confidence: MEDIUM
+      likelihood: LOW
+      impact: HIGH
+      polarion-rule: true
+      references:
+        - https://testdrive.polarion.com/polarion/sdk/doc/javadoc/com/polarion/platform/security/ISecurityService.html
+        - https://github.com/SchweizerischeBundesbahnen/ch.sbb.polarion.extension.generic/blob/main/app/src/main/java/ch/sbb/polarion/extension/generic/service/PolarionService.java
+    # The method names are specific to ISecurityService, so the receiver is
+    # not typed. Typing it would miss the common chained spelling
+    # `PlatformContext.getPlatform().lookupService(ISecurityService.class)
+    # .doAsSystemUser(...)`, whose receiver type semgrep cannot infer.
+    #
+    # `getSystemUserSubject()` is matched on its own rather than as the first
+    # argument of `doAsUser(...)`: the subject is often stored in a variable
+    # first, and obtaining it is the elevation step either way.
+    #
+    # `login(...)` is matched at its THREE-argument arity only. The no-argument
+    # `securityService.login()` re-authenticates the current request user and
+    # is not an elevation; it is the spelling on the corpus
+    # (generic `PersonalAccessTokenValidator`), and an untyped `login(...)`
+    # reports it. Both spellings are pinned, one in each fixture.
+    pattern-either:
+      - pattern: $SECURITY.doAsSystemUser(...)
+      - pattern: $SECURITY.getSystemUserSubject()
+      - pattern: $SECURITY.loginUserFromVault(...)
+      - pattern: $SECURITY.login($USER, $PASSWORD, $CONTEXT)
+      - pattern: $SECURITY.loginWithToken(...)
