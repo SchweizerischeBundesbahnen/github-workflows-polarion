@@ -52,7 +52,7 @@ passing on a bare `> 0`. A case the rule is known not to reach carries
 | `polarion-rest-no-authz-check` | WARNING | A REST controller method that changes state without `@Secured` or a per-endpoint permission check. Suppressed for classes whose `@Path` starts with `/internal`. |
 | `polarion-get-with-write-transaction` | ERROR | A `@GET` method that opens a write transaction. |
 | `polarion-transaction-no-permission-check` | WARNING | A call that changes state outside a platform API (JDBC update, `java.io` / `java.nio.file` / commons-io write, `setAccessible(true)`) inside a write transaction, or in a same-file method the transaction calls, with no permission check before it. |
-| `polarion-elevated-privileges` | WARNING | `doAsSystemUser(...)`, `getSystemUserSubject()`, `loginUserFromVault(...)`, or a three-argument `login(...)` / `loginWithToken(...)`: code that runs with, or logs in with, rights other than the request user's. |
+| `polarion-elevated-privileges` | WARNING | `doAsSystemUser(...)`, `getSystemUserSubject()`, `loginUserFromVault(...)`, `login(user, password, context)` or `loginWithToken(...)`: code that runs with, or logs in with, rights other than the request user's. |
 | `polarion-velocity-ssti` | ERROR | `VelocityEngine` constructed without `SecureUberspector`, which exposes Java reflection to template authors. |
 | `polarion-xxe-unsafe-parser` | ERROR | `DocumentBuilderFactory` / `SAXParserFactory` / `XMLInputFactory` created without `disallow-doctype-decl` or an emptied `ACCESS_EXTERNAL_DTD`. |
 | `polarion-hardcoded-creds-config` | ERROR | A non-placeholder credential in a `.properties` or `.xml` configuration file. |
@@ -114,8 +114,16 @@ in diff-tool: `DocumentCopyService` sets a comment author as the system user, an
 `ExecutionQueueSettings` reads global settings as the system user. Both are the
 review the rule exists to prompt. The two changed rules were also run over the 17
 other local `ch.sbb.polarion.extension.*` repositories with Java sources, with 0
-findings. Both numbers held after the rule was extended in review to one-level
-helpers, chained JDBC statements and guard polarity.
+findings. Both numbers held through the review rounds that followed: one-level
+helpers, chained JDBC statements, guard polarity, helper arity, the widened write
+sinks, the compound guard shapes and the login entry points.
+
+The last of those rounds was re-measured differently, over all 43 local target
+repositories at once rather than the five above: 12 findings before and after the
+change, composition identical (diff-tool 2 `polarion-elevated-privileges`,
+fake-services 9 `polarion-rest-no-authz-check`, mailworkflow 1
+`polarion-workflow-function-no-authz`). `polarion-transaction-no-permission-check`
+reports nowhere on any of them.
 
 ## Known rule gaps
 
