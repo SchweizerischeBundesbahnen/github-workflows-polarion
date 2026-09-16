@@ -177,10 +177,12 @@ repeated in the header of the rule it applies to.
   cleared a write made precisely when permission is denied. The check needs a
   receiver: `securityService.checkPermission(...)`, `this.`-qualified and
   statically imported spellings are recognized, because semgrep resolves all
-  three. A negated condition may be compound at any depth; a positive condition
-  is reached through one level of `&&`, since the deep expression that would
-  cover every depth matches the negated call too and brings back the cleared
-  inverted write. What remains out of reach, each pinned in the vulnerable
+  three. A negated condition may be a disjunction of any length, with the check
+  on either side; a conjunction does not clear it, because on the other branch
+  the check never runs. A positive condition is reached through one level of
+  `&&`. Neither side uses a deep expression: inside a positive clause it matches
+  the negated call, inside a negated one it accepts a conjunction, and both
+  mistakes clear a write that nothing checked. What remains out of reach, each pinned in the vulnerable
   fixture: a check in the caller does not clear a finding in its helper; an
   extension helper with another name (`checkPermissions()`,
   `isModificationAllowed()`), a receiverless delegate and a guard throwing
