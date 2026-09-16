@@ -52,7 +52,7 @@ passing on a bare `> 0`. A case the rule is known not to reach carries
 | `polarion-rest-no-authz-check` | WARNING | A REST controller method that changes state without `@Secured` or a per-endpoint permission check. Suppressed for classes whose `@Path` starts with `/internal`. |
 | `polarion-get-with-write-transaction` | ERROR | A `@GET` method that opens a write transaction. |
 | `polarion-transaction-no-permission-check` | WARNING | A call that changes state outside a platform API (JDBC update, `java.io` / `java.nio.file` / commons-io write, `setAccessible(true)`) inside a write transaction, or in a same-file method the transaction calls, with no permission check before it. |
-| `polarion-elevated-privileges` | WARNING | `doAsSystemUser(...)`, `getSystemUserSubject()` or `loginUserFromVault(...)`: code that runs with rights other than the request user's. |
+| `polarion-elevated-privileges` | WARNING | `doAsSystemUser(...)`, `getSystemUserSubject()`, `loginUserFromVault(...)`, or a three-argument `login(...)` / `loginWithToken(...)`: code that runs with, or logs in with, rights other than the request user's. |
 | `polarion-velocity-ssti` | ERROR | `VelocityEngine` constructed without `SecureUberspector`, which exposes Java reflection to template authors. |
 | `polarion-xxe-unsafe-parser` | ERROR | `DocumentBuilderFactory` / `SAXParserFactory` / `XMLInputFactory` created without `disallow-doctype-decl` or an emptied `ACCESS_EXTERNAL_DTD`. |
 | `polarion-hardcoded-creds-config` | ERROR | A non-placeholder credential in a `.properties` or `.xml` configuration file. |
@@ -61,7 +61,7 @@ passing on a bare `> 0`. A case the rule is known not to reach carries
 
 ## Baseline on the target corpus
 
-Both measurements below run the Polarion rules only, with no registry packs.
+The measurements below run the Polarion rules only, with no registry packs.
 
 The rules were tuned to a locked-in baseline of **13 findings** on 2026-05-06,
 at the SHAs recorded then: api-extender 1, generic 2, pdf-exporter 0,
@@ -77,11 +77,15 @@ Re-measured against current `main` on 2026-08-22, semgrep 1.172.0:
 | docx-exporter | f8d956f | 0 |
 | diff-tool | 079d9f7 | 15 |
 
-18 in total. Every one is `polarion-transaction-no-permission-check` at INFO;
-diff-tool gained five as new transactions were added since May. The other seven
-rules fire nowhere on the corpus and act as regression guards on new code. Treat
-that as the point of the pack in CI today: it is not a backlog of findings to
-clear.
+18 in total, at the rule set of that date. Every one was
+`polarion-transaction-no-permission-check`, which was INFO then and fired on
+every write transaction; diff-tool gained five as new transactions were added
+since May. The other rules of that date fired nowhere on the corpus and acted as
+regression guards on new code.
+
+That paragraph is historical. The rule was narrowed in 2026-09 and is now
+WARNING, `polarion-elevated-privileges` joined the pack, and nine rules ship.
+The current numbers are in the 2026-09 table below.
 
 The same five trees were measured with the rule pack as it stood before
 `polarion-velocity-ssti` and `polarion-xxe-unsafe-parser` were rewritten to match
@@ -146,9 +150,11 @@ repeated in the header of the rule it applies to.
   defect.
 
   Calls are followed one level into a method of the same file, spelled
-  `helper(...)` or `this.helper(...)`, and the finding lands in the helper. A
-  helper two levels down, a method on another object and a method reference are
-  not followed, because semgrep reads one file at a time. A chained
+  `helper(...)` or `this.helper(...)`, matched on name and arity for 0 to 3
+  parameters, and the finding lands in the helper. A helper two levels down, a
+  method on another object, a method reference and a helper with four or more
+  parameters are not followed, because semgrep reads one file at a time and
+  cannot wildcard an arity. A chained
   `connection.prepareStatement(sql).execute()` is reached through the
   `Connection` call that creates the statement. A bypass in a read-only
   transaction or outside any transaction is not reported: file IO outside a
@@ -160,17 +166,29 @@ repeated in the header of the rule it applies to.
   `PermissionDeniedException`, `ForbiddenException`, `NotAuthorizedException` or
   `SecurityException`, spelled by simple name. The thrown type is named because a
   bare `throw` matched a rethrow in a `catch` nested in the guard body, which
-  cleared a write made precisely when permission is denied. What remains out of
-  reach, each pinned in the vulnerable fixture: a check in the caller does not
-  clear a finding in its helper; an extension helper with another name
-  (`checkPermissions()`, `isModificationAllowed()`) and a guard throwing another
-  type do not clear the rule; a write in the `else` of a positive guard, a write
-  inside a terminating guard, and a guard that throws on one path only are
-  cleared. Semgrep matches statements, not paths.
+  cleared a write made precisely when permission is denied. The check needs a
+  receiver: `securityService.checkPermission(...)`, `this.`-qualified and
+  statically imported spellings are recognized, because semgrep resolves all
+  three. A negated condition may be compound at any depth; a positive condition
+  is reached through one level of `&&`, since the deep expression that would
+  cover every depth matches the negated call too and brings back the cleared
+  inverted write. What remains out of reach, each pinned in the vulnerable
+  fixture: a check in the caller does not clear a finding in its helper; an
+  extension helper with another name (`checkPermissions()`,
+  `isModificationAllowed()`), a receiverless delegate and a guard throwing
+  another type do not clear the rule; a helper of the same name and arity in a
+  nested class is reported although the transaction cannot reach it; a write in
+  the `else` of a positive guard, a write inside a terminating guard, and a
+  guard that throws on one path only are cleared. Semgrep matches statements,
+  not paths.
 - **`polarion-elevated-privileges` reports the elevation, not its effect.**
-  `doAsSystemUser(...)`, `getSystemUserSubject()` and `loginUserFromVault(...)`
-  are matched wherever they appear, whether the block reads or writes, because a
-  read as the system user can expose data the caller may not see. A read of
+  `doAsSystemUser(...)`, `getSystemUserSubject()`, `loginUserFromVault(...)`,
+  `login(user, password, context)` and `loginWithToken(...)` are matched wherever
+  they appear, whether the block reads or writes, because a read as the system
+  user can expose data the caller may not see. `login(...)` is matched at its
+  three-argument arity only: the no-argument `securityService.login()`
+  re-authenticates the request user and elevates nothing, and it is the spelling
+  on the corpus. A read of
   global configuration that every user may cause is a valid dismissal. The
   receiver is not typed, so the chained
   `lookupService(ISecurityService.class).doAsSystemUser(...)` is reached; a
