@@ -2,12 +2,6 @@
 name: PR checks (reusable)
 on:
   workflow_call:
-    inputs:
-      python-version:
-        description: Unused since commitizen runs through uv, which supplies its own Python. Kept so existing callers keep working.
-        required: false
-        type: string
-        default: "3.x"
 permissions: {}
 jobs:
   check-conventional-commit:

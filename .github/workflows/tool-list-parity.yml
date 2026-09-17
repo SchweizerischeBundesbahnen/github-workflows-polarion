@@ -19,10 +19,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version: "3.x"
-      - run: pip install pyyaml
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4  # v10.1.0
       # Fails when a tool is declared in settings.permissions.allow but not in
       # claude_args --allowedTools, or the reverse. The first direction fails
       # silently at runtime, which is why it is asserted here.
@@ -31,7 +28,20 @@ jobs:
       # a literal filename. Both extensions, matching the pre-commit hook's
       # ^\.github/workflows/.*\.ya?ml$ — CI is the binding gate, so it must not
       # check less than the advisory hook does.
+      #
+      # uv rather than pip, matching reusable-pr.yml: --no-build resolves from
+      # wheels only, so nothing runs a setup script during installation, and the
+      # pyyaml version is pinned.
+      #
+      # The same pin is given to this script a second time by
+      # .pre-commit-config.yaml through additional_dependencies, and the two must
+      # not diverge or the advisory hook and this binding gate run different
+      # code. Different Renovate managers read the two sides — custom.regex here,
+      # the built-in pre-commit manager there — so renovate.json groups both
+      # under `python commit-gate tooling` to move them in one branch. Nothing
+      # asserts the equality; the grouping is what maintains it.
       - run: |
           shopt -s nullglob
           workflows=(.github/workflows/*.yml .github/workflows/*.yaml)
-          python .github/scripts/check_tool_list_parity.py "${workflows[@]}"
+          uv run --no-project --no-build --with pyyaml==6.0.3 \
+            .github/scripts/check_tool_list_parity.py "${workflows[@]}"

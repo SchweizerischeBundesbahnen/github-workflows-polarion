@@ -41,4 +41,4 @@ jobs:
         shell: bash
         run: |
           # shellcheck disable=SC2086
-          npx @redocly/cli@latest lint "$SPEC_PATH" --format=github-actions $REDOCLY_ARGS
+          npx @redocly/cli@2.53.2 lint "$SPEC_PATH" --format=github-actions $REDOCLY_ARGS
