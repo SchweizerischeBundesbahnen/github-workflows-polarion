@@ -31,9 +31,15 @@ jobs:
       #
       # uv rather than pip, matching reusable-pr.yml: --no-build resolves from
       # wheels only, so nothing runs a setup script during installation, and the
-      # pyyaml version is pinned. That pin is the one .pre-commit-config.yaml
-      # gives the same script through additional_dependencies — keep the two in
-      # step, or the advisory hook and the binding gate run different code.
+      # pyyaml version is pinned.
+      #
+      # The same pin is given to this script a second time by
+      # .pre-commit-config.yaml through additional_dependencies, and the two must
+      # not diverge or the advisory hook and this binding gate run different
+      # code. Different Renovate managers read the two sides — custom.regex here,
+      # the built-in pre-commit manager there — so renovate.json groups both
+      # under `python commit-gate tooling` to move them in one branch. Nothing
+      # asserts the equality; the grouping is what maintains it.
       - run: |
           shopt -s nullglob
           workflows=(.github/workflows/*.yml .github/workflows/*.yaml)
