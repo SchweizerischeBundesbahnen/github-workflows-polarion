@@ -9,6 +9,10 @@ on:
           must be one CodeQL extracts without a build, because the analysis runs
           with `build-mode: none`. Java belongs in reusable-codeql-java.yml,
           which builds the code first.
+
+          Name only the languages the repository actually contains: CodeQL
+          fails an analysis that finds no source file of the language it was
+          asked for, so a repository without a UI needs `["actions"]` here.
         required: false
         type: string
         default: '["javascript-typescript", "actions"]'
