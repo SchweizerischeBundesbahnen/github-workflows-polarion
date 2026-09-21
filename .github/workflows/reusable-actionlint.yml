@@ -2,37 +2,59 @@
 name: ActionLint (reusable)
 on:
   workflow_call:
-    inputs:
-      reporter:
-        description: "Reviewdog reporter: github-check or github-pr-check"
-        required: false
-        type: string
-        default: github-check
-      fail_level:
-        description: "Fail level: error, warning, info"
-        required: false
-        type: string
-        default: error
 permissions: {}
 jobs:
   actionlint:
+    # Job id and name are load-bearing: 37 repositories call this workflow, and
+    # the check run they report is `actionlint / Check GitHub Actions Workflows`.
+    # A required status check matches on that string, so renaming either half
+    # leaves every consumer waiting on a check nobody reports.
     name: Check GitHub Actions Workflows
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
-      checks: write
       contents: read
-      pull-requests: read
+    env:
+      # Upstream rhysd/actionlint, run as a pinned release binary rather than
+      # through reviewdog/action-actionlint. That action bakes its actionlint
+      # into its own Dockerfile and exposes no input to choose the version or
+      # the source, so v1.75.0 was able to replace upstream with the fork
+      # kjanat/actionlint through an ordinary dependency bump — reaching all 37
+      # consumers at once, and reporting findings from rules upstream does not
+      # have. Running the binary puts that choice here, where it is reviewable,
+      # and Renovate keeps this version current via the customManager in
+      # renovate.json.
+      ACTIONLINT_VERSION: 1.7.12
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 1
-          persist-credentials: true  # Required: reviewdog needs git credentials for diff fetch on private repos
+          persist-credentials: false
+      - name: Install actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+          curl -sSfL -o actionlint.tar.gz "${base}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -sSfL -o checksums.txt "${base}/actionlint_${ACTIONLINT_VERSION}_checksums.txt"
+          # Guards a truncated or corrupted download. The checksum file comes
+          # from the same release, so it is not evidence against a compromised
+          # release — the pinned version is what bounds that.
+          sha256sum --check --ignore-missing checksums.txt
+          tar -xzf actionlint.tar.gz actionlint
       - name: Run actionlint
-        uses: reviewdog/action-actionlint@0f79693de552e66b9934daa63513584415a955e4  # v1.75.2
-        with:
-          github_token: ${{ github.token }}
-          reporter: ${{ inputs.reporter }}
-          fail_level: ${{ inputs.fail_level }}
-          level: error
-          filter_mode: nofilter
+        shell: bash
+        # `::error` lines are GitHub's own annotation format, so findings appear
+        # on the pull request diff without a reporter action. actionlint exits
+        # non-zero on any finding, which fails the job.
+        #
+        # The template is passed through env rather than quoted inline: as a
+        # single-quoted literal in the script it is a Go template that
+        # shellcheck reads as a shell expansion, raising SC2016 on actionlint's
+        # own documented invocation.
+        env:
+          FORMAT: "{{range $err := .}}::error file={{$err.Filepath}},line={{$err.Line}},col={{$err.Column}}::{{$err.Message}}%0A{{end}}"
+        run: |
+          set -euo pipefail
+          ./actionlint -color -format "$FORMAT"

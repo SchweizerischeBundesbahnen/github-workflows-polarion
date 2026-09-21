@@ -29,6 +29,19 @@
     },
     {
       "customType": "regex",
+      "description": "The upstream actionlint release that reusable-actionlint.yml downloads and runs. The github-actions manager cannot see it because actionlint is no longer consumed as an action: reviewdog/action-actionlint bakes its binary into its own Dockerfile with no input to choose it, and used that to swap upstream for a fork in a patch bump. Running the release binary moves that choice into this repository, and this entry is what keeps it from going stale as a result",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/reusable-actionlint\\.yml$/"
+      ],
+      "matchStrings": [
+        "ACTIONLINT_VERSION:\\s*(?<currentValue>\\d[^\\s]*)"
+      ],
+      "depNameTemplate": "rhysd/actionlint",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
       "description": "npm package versions pinned inline in an npx invocation. Nothing else reads them, and the alternative is the `@latest` this replaced, which resolves at run time and therefore gives a reusable workflow a different linter on every call",
       "managerFilePatterns": [
         "/^\\.github/workflows/.+\\.ya?ml$/"
