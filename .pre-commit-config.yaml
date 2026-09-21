@@ -37,8 +37,11 @@ repos:
   # actionlint that `reviewdog/action-actionlint` bundles in CI — the action
   # exposes no input to choose it, so a divergence here means the commit gate
   # and CI disagree about whether a workflow is valid.
+  # Pinned to the commit, not the tag: a git tag is mutable and the hook runs
+  # this code on the developer's machine, so the tag is not a pin against the
+  # upstream being changed under it. `2da2ceb` is v1.17.0.
   - repo: https://github.com/kjanat/actionlint
-    rev: v1.17.0
+    rev: 2da2ceb4af2c7ecc48f5b9311d85080c3971b5f0
     hooks:
       - id: actionlint
   - repo: local
