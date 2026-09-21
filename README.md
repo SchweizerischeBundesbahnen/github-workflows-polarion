@@ -26,6 +26,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)** a
 | `reusable-release-please.yml` | Automated releases and changelogs using release-please (Maven, Python, Docker, etc.) |
 | `reusable-release-please-guard.yml` | Blocks PR merges when the base branch `pom.xml` version is not a SNAPSHOT (prevents post-release drift) |
 | `reusable-codeql-java.yml` | CodeQL analysis for Java repositories, using `build-mode: manual` |
+| `reusable-codeql-js-actions.yml` | CodeQL analysis for JavaScript/TypeScript and GitHub Actions workflows, using `build-mode: none` |
 | `reusable-polarion-semgrep.yml` | Polarion-specific Semgrep rules, uploaded to Code Scanning ([rule pack](polarion-semgrep-rules/README.md)) |
 
 ## Usage
@@ -112,6 +113,38 @@ jobs:
     with:
       release-type: simple
       include-v-in-tag: false
+```
+
+```yaml
+# CodeQL — one caller workflow, one job per analysed language. A repository with
+# both Java and a JavaScript UI needs both jobs: each reusable workflow covers
+# only the languages named in its file, and a language nobody analyses is simply
+# never scanned.
+on:
+  push:
+    branches: [main, release-v*]
+  pull_request:
+    branches: [main, release-v*]
+    types: [opened, synchronize, reopened, ready_for_review]
+  schedule:
+    - cron: 17 5 * * 0
+permissions: {}
+jobs:
+  analyze:
+    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-codeql-java.yml@main
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+      packages: read
+    secrets:
+      IO_JFROG_SBB_POLARION_TOKEN: ${{ secrets.IO_JFROG_SBB_POLARION_TOKEN }}
+  analyze-js-actions:
+    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-codeql-js-actions.yml@main
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
 ```
 
 ```yaml

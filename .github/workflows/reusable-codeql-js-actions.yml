@@ -1,0 +1,59 @@
+---
+name: CodeQL JavaScript and Actions (reusable)
+on:
+  workflow_call:
+    inputs:
+      languages:
+        description: |
+          JSON array of CodeQL languages to analyse. Every language named here
+          must be one CodeQL extracts without a build, because the analysis runs
+          with `build-mode: none`. Java belongs in reusable-codeql-java.yml,
+          which builds the code first.
+        required: false
+        type: string
+        default: '["javascript-typescript", "actions"]'
+      query-suite:
+        description: CodeQL query suite (security-extended | security-and-quality)
+        required: false
+        type: string
+        default: security-extended
+      timeout-minutes:
+        description: Job timeout in minutes
+        required: false
+        type: number
+        default: 15
+permissions: {}
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      # One language failing to extract must not hide the verdict of the other.
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(inputs.languages) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63  # v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: ${{ inputs.query-suite }}
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63  # v4
+        with:
+          # The category is the identity of the Code Scanning configuration, and
+          # `/language:<lang>` is the one CodeQL default setup used. Keeping it
+          # means a repository moving off default setup continues its existing
+          # configuration instead of leaving it behind as a stale one whose last
+          # scan never advances again.
+          category: /language:${{ matrix.language }}
