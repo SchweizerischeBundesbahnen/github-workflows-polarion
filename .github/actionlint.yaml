@@ -8,13 +8,3 @@ paths:
       # pack to this workflow's own commit instead of a caller-supplied ref.
       # Remove this filter once actionlint ships the properties.
       - 'property "workflow_(repository|sha)" is not defined in object type'
-  .github/workflows/codeql.yml:
-    ignore:
-      # actionlint 1.7.12 does not model GitHub's "self-repository" `uses:`
-      # syntax (`$/...`), added in July 2026, and reports it as a malformed
-      # reusable workflow call. zizmor's `self-repository` audit requires that
-      # form in place of the workspace-relative `./...` one, because only the
-      # former counts as a pin for repository policy and cannot resolve to an
-      # action a previous step cloned at runtime. Remove this filter once
-      # actionlint accepts the syntax.
-      - 'is not following the format "owner/repo/path/to/workflow\.yml@ref"'

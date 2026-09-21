@@ -120,6 +120,14 @@ jobs:
 # both Java and a JavaScript UI needs both jobs: each reusable workflow covers
 # only the languages named in its file, and a language nobody analyses is simply
 # never scanned.
+#
+# Disable CodeQL default setup in the repository before adding this workflow.
+# The two cannot coexist: while default setup is enabled every advanced analysis
+# is rejected at upload with "CodeQL analyses from advanced configurations
+# cannot be processed when the default setup is enabled", after the scan has
+# already run. Conversely, enabling advanced setup disables default setup, and
+# any language the advanced workflow does not name then stops being scanned
+# without further notice — which is the gap these two workflows together close.
 on:
   push:
     branches: [main, release-v*]
