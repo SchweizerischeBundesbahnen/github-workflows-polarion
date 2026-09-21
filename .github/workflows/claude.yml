@@ -12,7 +12,12 @@ on:
 permissions: {}
 jobs:
   claude:
-    uses: ./.github/workflows/reusable-claude.yml
+    uses: $/.github/workflows/reusable-claude.yml
+    # `issue_comment` and `issues` are low-trust triggers, so their cache
+    # access defaults to read-only — but a called workflow can request more
+    # unless the caller caps it. Neither side caches anything, so `none` is the
+    # honest cap.
+    cache-mode: none
     permissions:
       contents: read
       pull-requests: read
