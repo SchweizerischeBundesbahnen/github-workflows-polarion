@@ -153,6 +153,12 @@ jobs:
       contents: read
       security-events: write
       actions: read
+    # `languages` defaults to '["javascript-typescript", "actions"]'. A
+    # repository with no JavaScript or TypeScript source must narrow it, because
+    # CodeQL fails an analysis that finds no source file of a language it was
+    # asked for:
+    #   with:
+    #     languages: '["actions"]'
 ```
 
 ```yaml
