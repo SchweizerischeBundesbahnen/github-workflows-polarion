@@ -128,6 +128,15 @@ jobs:
 # already run. Conversely, enabling advanced setup disables default setup, and
 # any language the advanced workflow does not name then stops being scanned
 # without further notice — which is the gap these two workflows together close.
+#
+# Update branch protection in the same change. The analysis category survives
+# the switch, the check RUN NAMES do not: default setup reports `Analyze
+# (<lang>)`, while a called workflow reports `<caller-job-id> / Analyze
+# (<lang>)` — so the jobs below report `analyze / Analyze (java-kotlin)` and
+# `analyze-javascript / Analyze (javascript-typescript)`. A required status
+# check naming the default-setup form is never reported again, and an
+# unreported required check does not fail — it waits, blocking every merge with
+# nothing red to point at.
 on:
   push:
     branches: [main, release-v*]
