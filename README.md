@@ -26,7 +26,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)** a
 | `reusable-release-please.yml` | Automated releases and changelogs using release-please (Maven, Python, Docker, etc.) |
 | `reusable-release-please-guard.yml` | Blocks PR merges when the base branch `pom.xml` version is not a SNAPSHOT (prevents post-release drift) |
 | `reusable-codeql-java.yml` | CodeQL analysis for Java repositories, using `build-mode: manual` |
-| `reusable-codeql-js-actions.yml` | CodeQL analysis for JavaScript/TypeScript and GitHub Actions workflows, using `build-mode: none` |
+| `reusable-codeql-javascript.yml` | CodeQL analysis for JavaScript/TypeScript and GitHub Actions workflows, using `build-mode: none` |
 | `reusable-polarion-semgrep.yml` | Polarion-specific Semgrep rules, uploaded to Code Scanning ([rule pack](polarion-semgrep-rules/README.md)) |
 
 ## Usage
@@ -147,8 +147,8 @@ jobs:
       packages: read
     secrets:
       IO_JFROG_SBB_POLARION_TOKEN: ${{ secrets.IO_JFROG_SBB_POLARION_TOKEN }}
-  analyze-js-actions:
-    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-codeql-js-actions.yml@main
+  analyze-javascript:
+    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-codeql-javascript.yml@main
     permissions:
       contents: read
       security-events: write

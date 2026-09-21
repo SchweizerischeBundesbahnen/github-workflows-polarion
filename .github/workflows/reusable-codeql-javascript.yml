@@ -1,5 +1,5 @@
 ---
-name: CodeQL JavaScript and Actions (reusable)
+name: CodeQL JavaScript (reusable)
 on:
   workflow_call:
     inputs:
