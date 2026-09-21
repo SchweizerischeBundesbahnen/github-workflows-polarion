@@ -65,6 +65,14 @@
       "semanticCommitType": "chore"
     },
     {
+      "description": "actionlint is declared twice for one gate and the two sides are read by DIFFERENT managers - `reviewdog/action-actionlint` in reusable-actionlint.yml by github-actions, and the `kjanat/actionlint` rev in .pre-commit-config.yaml by pre-commit - so ungrouped they arrive as two separately mergeable pull requests. The action bakes its actionlint binary into its own image and exposes no input to select it, so a bump of the action silently changes which linter CI runs while the commit gate stays where it was, and the divergence surfaces as a red default branch on whatever pull request is open. Measured: 5535848 moved the action alone, took CI from upstream rhysd 1.7.12 to the fork 1.17.0, and turned main red. Grouping does not reconcile the versions - the action's tag does not name the actionlint it bundles, so that stays a human read of its release notes - it puts both bumps in ONE branch where that read is performable. This rule must stay after the github-actions ungrouping rule above, which nulls the group for every action",
+      "matchPackageNames": [
+        "reviewdog/action-actionlint",
+        "kjanat/actionlint"
+      ],
+      "groupName": "actionlint gate"
+    },
+    {
       "description": "pyyaml and commitizen are each declared twice for the same gate - once as an inline pin in a workflow run step, once in .pre-commit-config.yaml - and the two sides are read by DIFFERENT managers (custom.regex and pre-commit), so ungrouped they arrive as two separately automerged pull requests and the advisory hook runs a different version from the binding gate in between. One branch moves both. commitizen needs both spellings because the workflow pin resolves through pypi as `commitizen` while the hook rev resolves through github-tags as `commitizen-tools/commitizen`. This rule must stay last: packageRules apply in array order and the preset groups the pre-commit manager into `pre-commit hooks`, which this overrides for these three names only",
       "matchPackageNames": [
         "pyyaml",
