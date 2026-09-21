@@ -37,18 +37,8 @@ repos:
   # actionlint that `reviewdog/action-actionlint` bundles in CI — the action
   # exposes no input to choose it, so a divergence here means the commit gate
   # and CI disagree about whether a workflow is valid.
-  # Pinned to the COMMIT, because this hook compiles and runs on the developer's
-  # machine and a git tag is mutable. `08bb2c4` is what v1.17.0 points at — the
-  # ref itself resolves to an annotated tag OBJECT (`2da2ceb`), which is only
-  # reachable through the ref that names it, so pinning that would break for
-  # everyone the moment upstream moved or deleted the tag.
-  #
-  # The `# frozen:` suffix is load-bearing rather than decorative: Renovate's
-  # pre-commit manager recognises a digest only in the `<sha>  # frozen: <tag>`
-  # form (lib/modules/manager/pre-commit/extract.ts), so a bare SHA here would
-  # silently stop receiving updates.
   - repo: https://github.com/kjanat/actionlint
-    rev: 08bb2c4f0d039744455b87aef1c647fb8b66d37b  # frozen: v1.17.0
+    rev: v1.17.0
     hooks:
       - id: actionlint
   - repo: local
