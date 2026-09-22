@@ -26,6 +26,7 @@ This repository contains **GitHub Actions workflows (reusable and caller/CI)** a
 | `reusable-release-please.yml` | Automated releases and changelogs using release-please (Maven, Python, Docker, etc.) |
 | `reusable-release-please-guard.yml` | Blocks PR merges when the base branch `pom.xml` version is not a SNAPSHOT (prevents post-release drift) |
 | `reusable-codeql-java.yml` | CodeQL analysis for Java repositories, using `build-mode: manual` |
+| `reusable-codeql-javascript.yml` | CodeQL analysis for JavaScript/TypeScript and GitHub Actions workflows, using `build-mode: none` |
 | `reusable-polarion-semgrep.yml` | Polarion-specific Semgrep rules, uploaded to Code Scanning ([rule pack](polarion-semgrep-rules/README.md)) |
 
 ## Usage
@@ -112,6 +113,61 @@ jobs:
     with:
       release-type: simple
       include-v-in-tag: false
+```
+
+```yaml
+# CodeQL — one caller workflow, one job per analysed language. A repository with
+# both Java and a JavaScript UI needs both jobs: each reusable workflow covers
+# only the languages named in its file, and a language nobody analyses is simply
+# never scanned.
+#
+# Disable CodeQL default setup in the repository before adding this workflow.
+# The two cannot coexist: while default setup is enabled every advanced analysis
+# is rejected at upload with "CodeQL analyses from advanced configurations
+# cannot be processed when the default setup is enabled", after the scan has
+# already run. Conversely, enabling advanced setup disables default setup, and
+# any language the advanced workflow does not name then stops being scanned
+# without further notice — which is the gap these two workflows together close.
+#
+# Update branch protection in the same change. The analysis category survives
+# the switch, the check RUN NAMES do not: default setup reports `Analyze
+# (<lang>)`, while a called workflow reports `<caller-job-id> / Analyze
+# (<lang>)` — so the jobs below report `analyze / Analyze (java-kotlin)` and
+# `analyze-javascript / Analyze (javascript-typescript)`. A required status
+# check naming the default-setup form is never reported again, and an
+# unreported required check does not fail — it waits, blocking every merge with
+# nothing red to point at.
+on:
+  push:
+    branches: [main, release-v*]
+  pull_request:
+    branches: [main, release-v*]
+    types: [opened, synchronize, reopened, ready_for_review]
+  schedule:
+    - cron: 17 5 * * 0
+permissions: {}
+jobs:
+  analyze:
+    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-codeql-java.yml@main
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+      packages: read
+    secrets:
+      IO_JFROG_SBB_POLARION_TOKEN: ${{ secrets.IO_JFROG_SBB_POLARION_TOKEN }}
+  analyze-javascript:
+    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-codeql-javascript.yml@main
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    # `languages` defaults to '["javascript-typescript", "actions"]'. A
+    # repository with no JavaScript or TypeScript source must narrow it, because
+    # CodeQL fails an analysis that finds no source file of a language it was
+    # asked for:
+    #   with:
+    #     languages: '["actions"]'
 ```
 
 ```yaml
