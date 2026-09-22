@@ -3,6 +3,27 @@
 Notes for people working with an agent on this repository. Each entry is a
 collaboration failure worth recognising early, not a code convention.
 
+## 2026-09-22 — An agent will report a capability as absent after searching the wrong place
+
+Asked whether a mechanism existed to propagate fixes from a repository template
+to the repositories generated from it, the agent searched the organisation's
+code for a workflow that did the job, found none, and reported that no such
+mechanism existed anywhere. It then wrote that conclusion into a filed ticket
+and proposed building the thing from scratch. The mechanism already existed —
+as an installed, enabled tool in the agent's own environment, whose description
+named the exact phrase the question had used.
+
+The failure has a shape worth recognising: the agent searched the subject of the
+question and not its own capabilities, and a negative answer from a search
+carries the same confident tone as a positive one. It costs a colleague a
+proposal to build what they already own, and it is expensive to catch late
+because the wrong answer is not visibly uncertain.
+
+When the question is whether something can be done rather than what some code
+says, ask the agent to list the tools it already has for it before it searches
+anywhere else, and treat any "there is no X" as provisional until it has said
+which places it looked and why those were the right ones.
+
 ## 2026-09-21 — Ask the agent what evidence a trust judgement rests on
 
 A Renovate bump replaced the actionlint binary CI runs with a community fork,
