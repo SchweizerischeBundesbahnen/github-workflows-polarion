@@ -32,8 +32,13 @@ repos:
     rev: v1.30.1
     hooks:
       - id: zizmor
-  - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.12
+  # kjanat/actionlint, the maintained successor to rhysd/actionlint, whose last
+  # commit is 2026-04-19 (rhysd/actionlint#719). This must stay in step with the
+  # actionlint that `reviewdog/action-actionlint` bundles in CI — the action
+  # exposes no input to choose it, so a divergence here means the commit gate
+  # and CI disagree about whether a workflow is valid.
+  - repo: https://github.com/kjanat/actionlint
+    rev: v1.17.0
     hooks:
       - id: actionlint
   - repo: local

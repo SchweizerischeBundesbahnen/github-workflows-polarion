@@ -6,7 +6,11 @@ on:
 permissions: {}
 jobs:
   add-to-project:
-    uses: ./.github/workflows/reusable-add-issue-to-project.yml
+    uses: $/.github/workflows/reusable-add-issue-to-project.yml
+    # `issues` is a low-trust trigger, so its cache access defaults to
+    # read-only — but a called workflow can request more unless the caller caps
+    # it. Neither side caches anything, so `none` is the honest cap.
+    cache-mode: none
     secrets:
       POLARION_GITHUB_APP_ID: ${{ secrets.POLARION_GITHUB_APP_ID }}
       POLARION_GITHUB_APP_PRIVATE_KEY: ${{ secrets.POLARION_GITHUB_APP_PRIVATE_KEY }}
