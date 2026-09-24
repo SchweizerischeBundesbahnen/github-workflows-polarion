@@ -460,7 +460,7 @@ jobs:
           # that posted a review, so the value matters only if the SDK ever enforces it.
           # A warning from that step means a new maximum: re-measure and reset, no margin.
           claude_args: >-
-            --max-turns 62 --model opus --effort high
+            --max-turns 5 --model opus --effort high
             --allowedTools "Read,Grep,Glob,BatchTool,mcp__github_inline_comment__create_inline_comment,Bash(gh pr review:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*)"
       # No if: it runs after either outcome of the action step, whose
       # continue-on-error keeps success() true, and is skipped on cancellation.
