@@ -280,6 +280,6 @@ jobs:
 - **Project rules**: `CLAUDE.md` in the calling repository
 - **Secret required**: `CLAUDE_CODE_OAUTH_TOKEN`
 - **Timeout**: 30 minutes per review
-- **Max turns**: 62 (measured maximum, see the workflow comment); a run past it that posted a review stays green with a warning, and a failed run that posted no review stays red
+- **Max turns**: 62 (measured maximum, see the workflow comment). A run the SDK stops at the limit (`error_max_turns`) stays red. A run that finishes successfully but whose `num_turns` exceeds the limit stays green with a warning, provided it posted a review. Any other failed run stays red
 - **Progress tracking**: `track_progress: true` — shows visual "In progress" → "Completed" status
 - **Extra focus**: Optional `extra_focus` input to direct the review toward specific concerns
