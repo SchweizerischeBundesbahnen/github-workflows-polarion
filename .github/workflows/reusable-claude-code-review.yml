@@ -471,6 +471,7 @@ jobs:
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_ID: ${{ github.run_id }}
           STARTED_AT: ${{ steps.classify-threads.outputs.started_at }}
           OUTCOME: ${{ steps.claude-review.outcome }}
           EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
@@ -506,6 +507,19 @@ jobs:
               || { echo "::error::could not read the pull request's reviews"; exit 1; }
             if (( posted > 0 )); then
               echo "::warning::claude-code-action failed after this run posted a review (num_turns=$(jq .num_turns <<<"$result")); treated as complete"
+              # The action has already headed this run's tracking comment "Claude
+              # encountered an error" (run.ts finally block); say it finished instead.
+              comment_id=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+                | jq -s --arg run "/actions/runs/$RUN_ID" 'add
+                    | map(select(.user.login == "claude[bot]" and (.body | contains($run))))
+                    | last | .id // empty') || comment_id=''
+              if [[ -n "$comment_id" ]]; then
+                gh api "repos/$REPO/issues/comments/$comment_id" --jq .body \
+                  | sed '1s/^\*\*Claude encountered an error/**Claude finished over the turn limit/' \
+                  | jq -Rs '{body: .}' \
+                  | gh api -X PATCH "repos/$REPO/issues/comments/$comment_id" --input - >/dev/null \
+                  || echo "::warning::could not update the tracking comment"
+              fi
               exit 0
             fi
           fi
