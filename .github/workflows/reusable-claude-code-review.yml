@@ -177,9 +177,16 @@ jobs:
             /tmp/classified-reviews.json)
           echo "review_round=$review_round" >> "$GITHUB_OUTPUT"
           echo "=== Review round: $review_round ==="
+
+          # Lower bound for "a review posted by this run" in the verdict step below.
+          echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@9171db3e57d6a3140a37ddc2ba92788584e0ead6  # v1.0.234
+        # The action fails a run whose result is a success once num_turns passes
+        # --max-turns, after the review has been posted (run 35609465070: three
+        # reviews, then red). The step after this decides the check instead.
+        continue-on-error: true
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           track_progress: true
@@ -446,6 +453,75 @@ jobs:
           # parse-sdk-options.ts passes this list to the SDK as allowedTools, its
           # permission allowlist, so a tool here only is both started and permitted.
           # They are kept identical so a reader can tell which list is authoritative.
+          # --max-turns 62 is the largest num_turns in the result record of the 56 most
+          # recent success/failure runs of claude-code-review.yml in this repository
+          # (2026-09-24; median 29, max 62); consumer repositories were not measured.
+          # The SDK stops a run at the limit with error_max_turns, which stays red, but it
+          # counts below num_turns: runs reached 62 under a limit of 50 without stopping.
+          # So 62 cuts short no measured review. A warning from the verdict step means a
+          # new maximum: re-measure and reset, no margin.
           claude_args: >-
-            --max-turns 50 --model opus --effort high
+            --max-turns 62 --model opus --effort high
             --allowedTools "Read,Grep,Glob,BatchTool,mcp__github_inline_comment__create_inline_comment,Bash(gh pr review:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*)"
+      # No if: it runs after either outcome of the action step, whose
+      # continue-on-error keeps success() true, and is skipped on cancellation.
+      - name: Report Claude result and decide the check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_ID: ${{ github.run_id }}
+          STARTED_AT: ${{ steps.classify-threads.outputs.started_at }}
+          OUTCOME: ${{ steps.claude-review.outcome }}
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+        run: |
+          set -euo pipefail
+          result='{}'
+          if [[ -n "$EXECUTION_FILE" && -f "$EXECUTION_FILE" ]]; then
+            # The action sets execution_file on success and failure (run.ts:318): a JSON
+            # array of SDK messages, whose "result" message carries subtype, is_error,
+            # num_turns and permission_denials. An unreadable or empty file leaves '{}',
+            # which fails closed below.
+            result=$(jq -c 'map(select(.type == "result")) | last // {}' "$EXECUTION_FILE") \
+              || result='{}'
+            [[ -n "$result" ]] || result='{}'
+          fi
+          echo "=== Result ==="
+          jq '{subtype, is_error, num_turns}' <<<"$result"
+          [[ "$OUTCOME" == success ]] && exit 0
+          # The action logs only a count of denials (run-claude-sdk.ts:150). Printed
+          # for a failed run only, since the log of a public repository is public.
+          echo "=== Permission denials ==="
+          jq -r '.permission_denials // [] | .[]
+            | "\(.tool_name): \(.tool_input | tostring | .[0:300])"' <<<"$result"
+          # Only a successful, non-error result is forgivable, and only when this
+          # run posted a review body for the head commit. A tracking comment
+          # (track_progress) is an issue comment and never matches.
+          if jq -e '.subtype == "success" and .is_error == false' <<<"$result" >/dev/null; then
+            posted=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/reviews" \
+              | jq -s --arg sha "$HEAD_SHA" --arg since "$STARTED_AT" 'add
+                  | map(select(.user.login == "claude[bot]" and .commit_id == $sha
+                               and (.body // "") != "" and .submitted_at >= $since))
+                  | length') \
+              || { echo "::error::could not read the pull request's reviews"; exit 1; }
+            if (( posted > 0 )); then
+              echo "::warning::claude-code-action failed after this run posted a review (num_turns=$(jq .num_turns <<<"$result")); treated as complete"
+              # The action has already headed this run's tracking comment "Claude
+              # encountered an error" (run.ts finally block); say it finished instead.
+              comment_id=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+                | jq -s --arg run "/actions/runs/$RUN_ID" 'add
+                    | map(select(.user.login == "claude[bot]" and (.body | contains($run))))
+                    | last | .id // empty') || comment_id=''
+              if [[ -n "$comment_id" ]]; then
+                gh api "repos/$REPO/issues/comments/$comment_id" --jq .body \
+                  | sed '1s/^\*\*Claude encountered an error/**Claude finished over the turn limit/' \
+                  | jq -Rs '{body: .}' \
+                  | gh api -X PATCH "repos/$REPO/issues/comments/$comment_id" --input - >/dev/null \
+                  || echo "::warning::could not update the tracking comment"
+              fi
+              exit 0
+            fi
+          fi
+          echo "::error::claude-code-action failed without a completed review from this run"
+          exit 1
