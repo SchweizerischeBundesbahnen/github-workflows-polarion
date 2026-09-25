@@ -3,6 +3,10 @@
 Notes for people working with an agent on this repository. Each entry is a
 collaboration failure worth recognising early, not a code convention.
 
+## 2026-09-25 — History shows where a limit did not bite, not whether it bites
+
+An agent that reads past runs to decide whether a safeguard ever fires sees only the runs the safeguard let through, and will conclude it never fires. Here that conclusion shaped a whole plan and reached the pull request description, and it took one run deliberately provoked with an absurdly low limit to overturn it, in minutes. When a plan rests on "this never happens", ask the agent to make it happen once before building on it.
+
 ## 2026-09-22 — An agent will report a capability as absent after searching the wrong place
 
 Asked whether a mechanism existed to propagate fixes from a repository template
