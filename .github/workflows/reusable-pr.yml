@@ -19,4 +19,4 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: uvx --no-build --from commitizen==4.18.1 cz check --rev-range "$BASE_SHA..$HEAD_SHA"
+        run: uvx --no-build --from commitizen==4.19.0 cz check --rev-range "$BASE_SHA..$HEAD_SHA"
