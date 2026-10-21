@@ -182,7 +182,7 @@ jobs:
           echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@e4a6faad497d33dbc7144135c75e41f82f0bf6c0  # v1.0.255
+        uses: anthropics/claude-code-action@a5a423f75c251dcbff8a74e99f83b2cb03c72bfa  # v1.0.256
         # The action fails a run whose result is a success once num_turns passes
         # --max-turns, after the review has been posted (run 35609465070: three
         # reviews, then red). The step after this decides the check instead.
