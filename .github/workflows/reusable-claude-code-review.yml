@@ -459,9 +459,14 @@ jobs:
           # The SDK stops a run at the limit with error_max_turns, which stays red, but it
           # counts below num_turns: runs reached 62 under a limit of 50 without stopping.
           # So 62 cuts short no measured review. A warning from the verdict step means a
-          # new maximum: re-measure and reset, no margin.
+          # new maximum: re-measure and reset, no margin. Those runs were all on Opus;
+          # re-measure on Sonnet runs once enough have accumulated.
+          # --model sonnet (#122): on identical material, a Sonnet diff review cost less
+          # than half as much as a larger model and reported all of its must-fix
+          # findings plus more. That measurement covers diff review only, so
+          # reusable-claude.yml, which implements changes, stays on Opus.
           claude_args: >-
-            --max-turns 62 --model opus --effort high
+            --max-turns 62 --model sonnet --effort high
             --allowedTools "Read,Grep,Glob,BatchTool,mcp__github_inline_comment__create_inline_comment,Bash(gh pr review:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*)"
       # No if: it runs after either outcome of the action step, whose
       # continue-on-error keeps success() true, and is skipped on cancellation.
