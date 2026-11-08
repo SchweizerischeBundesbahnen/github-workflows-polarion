@@ -479,9 +479,24 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           STARTED_AT: ${{ steps.classify-threads.outputs.started_at }}
           OUTCOME: ${{ steps.claude-review.outcome }}
+          CONCLUSION: ${{ steps.claude-review.outputs.conclusion }}
           EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
         run: |
           set -euo pipefail
+          # A successful step without a conclusion output ran no review: the action
+          # returns before running Claude (run.ts), most often on its workflow
+          # validation guard, which refuses a run whose caller workflow, or a
+          # reusable workflow it calls through ./.github/workflows/, differs from
+          # the default branch. The skip output that names that cause is not
+          # declared in action.yml, so the empty conclusion is the only signal.
+          # Warned rather than failed: such a pull request cannot get a review
+          # before it merges, so a red check would only block it.
+          if [[ "$OUTCOME" == success && -z "$CONCLUSION" ]]; then
+            msg="claude-code-action ran no review on this run, most likely because a workflow file differs from the default branch. This check does not mean the pull request was reviewed."
+            echo "::warning title=No Claude review::$msg"
+            echo "**No Claude review:** $msg" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           result='{}'
           if [[ -n "$EXECUTION_FILE" && -f "$EXECUTION_FILE" ]]; then
             # The action sets execution_file on success and failure (run.ts:318): a JSON
