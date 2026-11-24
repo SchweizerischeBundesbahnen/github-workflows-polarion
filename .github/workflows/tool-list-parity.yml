@@ -43,5 +43,5 @@ jobs:
       - run: |
           shopt -s nullglob
           workflows=(.github/workflows/*.yml .github/workflows/*.yaml)
-          uv run --no-project --no-build --with pyyaml==6.0.3 \
+          uv run --no-project --no-build --with pyyaml==6.0.4 \
             .github/scripts/check_tool_list_parity.py "${workflows[@]}"

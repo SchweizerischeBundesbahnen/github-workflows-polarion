@@ -47,5 +47,5 @@ repos:
         name: Assert claude-code-action tool lists agree
         entry: .github/scripts/check_tool_list_parity.py
         language: python
-        additional_dependencies: [pyyaml==6.0.3]
+        additional_dependencies: [pyyaml==6.0.4]
         files: ^\.github/workflows/.*\.ya?ml$
